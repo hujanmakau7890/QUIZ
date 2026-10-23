@@ -1,5 +1,5 @@
 -- ============================================================
--- SKEMA DATABASE QUIZ & PAPAN PARTISIPASI (SUPABASE)
+-- SKEMA DATABASE PAPAN PARTISIPASI & Q&A APPROVAL (SUPABASE)
 -- ============================================================
 
 -- 1. Tabel Sesi Pelatihan / Kelas
@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS public.quiz_sessions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
--- 2. Tabel Peserta (Hasil scan QR & isi form)
+-- 2. Tabel Peserta (Hasil scan QR & isi form nama di HP)
 CREATE TABLE IF NOT EXISTS public.quiz_participants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_code TEXT NOT NULL REFERENCES public.quiz_sessions(code) ON DELETE CASCADE,
@@ -21,41 +21,29 @@ CREATE TABLE IF NOT EXISTS public.quiz_participants (
     CONSTRAINT uq_session_participant UNIQUE (session_code, name)
 );
 
--- 3. Tabel Log / Riwayat Poin (Termasuk Poin Interaktif & Kuis)
+-- 3. Tabel Log / Riwayat Poin Partisipasi
 CREATE TABLE IF NOT EXISTS public.quiz_point_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_code TEXT NOT NULL REFERENCES public.quiz_sessions(code) ON DELETE CASCADE,
     participant_id UUID NOT NULL REFERENCES public.quiz_participants(id) ON DELETE CASCADE,
-    category TEXT NOT NULL,                      -- 'quiz', 'ask', 'crit', 'ans', 'minus'
-    points INT NOT NULL,                         -- Nilai perubahan (+10, +5, -2, dsb)
-    description TEXT DEFAULT '',                 -- Catatan / Judul Soal
+    category TEXT NOT NULL,                      -- 'ask', 'crit', 'ans', 'minus'
+    points INT NOT NULL,                         -- Nilai perubahan (+5, +10, -2, dsb)
+    description TEXT DEFAULT '',                 -- Catatan / Isi pertanyaan
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
--- 4. Tabel Bank Soal Kuis
-CREATE TABLE IF NOT EXISTS public.quiz_questions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    session_code TEXT REFERENCES public.quiz_sessions(code) ON DELETE CASCADE,
-    question TEXT NOT NULL,
-    options JSONB NOT NULL,                      -- ["Pilihan A", "Pilihan B", "Pilihan C", "Pilihan D"]
-    correct_index INT NOT NULL,                  -- Index jawaban benar (0, 1, 2, atau 3)
-    points INT NOT NULL DEFAULT 10,              -- Poin jika benar
-    explanation TEXT DEFAULT '',                 -- Pembahasan / learning points
-    order_num INT NOT NULL DEFAULT 1,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
-);
-
--- 5. Tabel Jawaban Peserta
-CREATE TABLE IF NOT EXISTS public.quiz_submissions (
+-- 4. Tabel Pengajuan Pertanyaan / Tanggapan dari Peserta (Menunggu Persetujuan Panitia)
+CREATE TABLE IF NOT EXISTS public.class_questions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_code TEXT NOT NULL REFERENCES public.quiz_sessions(code) ON DELETE CASCADE,
-    question_id UUID NOT NULL REFERENCES public.quiz_questions(id) ON DELETE CASCADE,
     participant_id UUID NOT NULL REFERENCES public.quiz_participants(id) ON DELETE CASCADE,
-    selected_index INT NOT NULL,
-    is_correct BOOLEAN NOT NULL,
+    participant_name TEXT NOT NULL,
+    participant_division TEXT DEFAULT '',
+    category TEXT NOT NULL DEFAULT 'ask',        -- 'ask' (Bertanya), 'crit' (Tanggapan Kritis), 'ans' (Menjawab)
+    question_text TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',      -- 'pending', 'approved', 'rejected'
     points_awarded INT NOT NULL DEFAULT 0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
-    CONSTRAINT uq_participant_question UNIQUE (participant_id, question_id)
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
 -- ============================================================
@@ -64,15 +52,12 @@ CREATE TABLE IF NOT EXISTS public.quiz_submissions (
 ALTER TABLE public.quiz_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quiz_participants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quiz_point_logs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.quiz_questions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.quiz_submissions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.class_questions ENABLE ROW LEVEL SECURITY;
 
--- Beri izin akses baca & tulis penuh untuk anon key di web app
 CREATE POLICY "Allow public all on quiz_sessions" ON public.quiz_sessions FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public all on quiz_participants" ON public.quiz_participants FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public all on quiz_point_logs" ON public.quiz_point_logs FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow public all on quiz_questions" ON public.quiz_questions FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow public all on quiz_submissions" ON public.quiz_submissions FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public all on class_questions" ON public.class_questions FOR ALL USING (true) WITH CHECK (true);
 
 -- ============================================================
 -- AKTIFKAN SUPABASE REALTIME
@@ -80,5 +65,4 @@ CREATE POLICY "Allow public all on quiz_submissions" ON public.quiz_submissions 
 ALTER PUBLICATION supabase_realtime ADD TABLE public.quiz_sessions;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.quiz_participants;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.quiz_point_logs;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.quiz_questions;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.quiz_submissions;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.class_questions;
