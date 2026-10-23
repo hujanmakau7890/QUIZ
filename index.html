@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Papan Partisipasi Kelas</title>
+<title>Papan Partisipasi & Quiz Learning</title>
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<!-- Supabase JS Client -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
@@ -42,71 +42,72 @@ tailwind.config = { theme: { extend: {
     <nav class="flex gap-1 bg-ink/5 rounded-full p-1" aria-label="Tampilan">
       <button data-go="peserta" class="tab px-4 py-2 rounded-full text-sm font-medium">Peserta</button>
       <button data-go="papan" class="tab px-4 py-2 rounded-full text-sm font-medium">Papan skor</button>
+      <button data-go="kuis" class="tab px-4 py-2 rounded-full text-sm font-medium">Kelola Kuis</button>
       <button data-go="riwayat" class="tab px-4 py-2 rounded-full text-sm font-medium">Riwayat</button>
     </nav>
-    <button onclick="exportCSV()" class="px-4 py-2 rounded-full text-sm font-medium bg-ink text-white hover:bg-sky">Ekspor CSV</button>
+    <button onclick="exportCSV()" class="px-4 py-2 rounded-full text-sm font-medium bg-ink text-white hover:bg-sky transition-colors">Ekspor CSV</button>
   </div>
 </header>
 
 <main id="admin" class="max-w-7xl mx-auto p-4">
-  <p id="modeNote" class="hidden mb-4 bg-sun/30 rounded-xl px-4 py-3 text-sm">
-    <b>Mode lokal:</b> Firebase belum diisi, jadi data hanya tersimpan di browser ini dan peserta di HP lain belum bisa mendaftar.
-    Isi <code>FIREBASE_CONFIG</code> di bagian atas script.
-  </p>
-
   <!-- Peserta -->
   <section data-tab="peserta">
     <div class="flex flex-wrap items-center gap-3 mb-5">
-      <button onclick="newSession()" class="px-5 py-3 rounded-xl bg-sun font-bold hover:brightness-95">Buat Sesi Pelatihan Baru</button>
+      <button onclick="newSession()" class="px-5 py-3 rounded-xl bg-sun font-bold text-ink shadow hover:brightness-95 transition-all">Buat Sesi Pelatihan Baru</button>
       <div class="flex gap-2 ml-auto">
         <input id="joinCode" type="text" placeholder="Kode sesi lama" aria-label="Kode sesi lama" class="w-40 bg-white border border-ink/15 rounded-xl px-3 py-2.5 uppercase focus:border-sky focus:outline-none">
-        <button onclick="joinSession()" class="px-4 py-2.5 rounded-xl bg-ink/5 font-medium hover:bg-ink/10">Buka</button>
+        <button onclick="joinSession()" class="px-4 py-2.5 rounded-xl bg-ink/5 font-medium hover:bg-ink/10 transition-colors">Buka</button>
       </div>
     </div>
 
-    <p id="noSes" class="text-center text-ink/60 py-16">Belum ada sesi. Klik “Buat Sesi Pelatihan Baru” untuk mendapatkan kode kelas dan QR pendaftaran.</p>
+    <p id="noSes" class="text-center text-ink/60 py-16">Belum ada sesi aktif. Klik “Buat Sesi Pelatihan Baru” untuk mendapatkan kode kelas dan QR barcode pendaftaran.</p>
 
     <div id="ses" class="hidden">
-      <div class="bg-white border border-ink/10 rounded-2xl p-4 md:p-5 mb-5 flex flex-wrap gap-5 items-center">
-        <div id="qr" class="bg-white p-2 border border-ink/10 rounded-xl"></div>
+      <div class="bg-white border border-ink/10 rounded-2xl p-4 md:p-5 mb-5 flex flex-wrap gap-5 items-center shadow-sm">
+        <div id="qr" class="bg-white p-2 border border-ink/10 rounded-xl shadow-inner"></div>
         <div class="flex-1 min-w-[16rem]">
-          <p class="text-sm text-ink/60">Kode kelas</p>
-          <p id="codeTxt" class="font-display font-extrabold text-4xl"></p>
-          <p id="cnt" class="mt-2 text-lg"></p>
-          <label for="baseUrl" class="block text-sm text-ink/60 mt-3">Alamat halaman ini (isi alamat hosting jika berbeda)</label>
-          <input id="baseUrl" type="url" placeholder="https://situs-anda.netlify.app/" class="w-full bg-paper border border-ink/15 rounded-lg px-3 py-2 text-sm focus:border-sky focus:outline-none">
-          <p id="joinUrl" class="text-sm break-all text-sky mt-1"></p>
-          <div class="flex gap-2 mt-3">
-            <button onclick="copyLink()" class="px-4 py-2 rounded-lg bg-ink text-white text-sm font-medium hover:bg-sky">Salin tautan</button>
-            <button onclick="endSession()" class="px-4 py-2 rounded-lg text-sm font-medium text-coral hover:bg-coral/10">Hapus sesi</button>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-mint/10 text-mint mb-1">
+            <span class="w-2 h-2 rounded-full bg-mint animate-pulse"></span> Terhubung ke Supabase
+          </span>
+          <p class="text-sm text-ink/60">Kode kelas untuk peserta:</p>
+          <p id="codeTxt" class="font-display font-extrabold text-4xl tracking-wider text-sky"></p>
+          <p id="cnt" class="mt-2 text-lg text-ink/80"></p>
+          <label for="baseUrl" class="block text-sm text-ink/60 mt-3">Alamat website ini (otomatis terdeteksi):</label>
+          <input id="baseUrl" type="url" placeholder="https://domain-anda.com" class="w-full bg-paper border border-ink/15 rounded-lg px-3 py-2 text-sm focus:border-sky focus:outline-none">
+          <p id="joinUrl" class="text-xs break-all text-sky font-mono mt-1"></p>
+          <div class="flex gap-2 mt-4">
+            <button onclick="copyLink()" class="px-4 py-2 rounded-lg bg-ink text-white text-sm font-medium hover:bg-sky transition-colors">Salin tautan</button>
+            <button onclick="endSession()" class="px-4 py-2 rounded-lg text-sm font-medium text-coral hover:bg-coral/10 transition-colors">Hapus sesi</button>
           </div>
         </div>
       </div>
 
       <div class="flex flex-wrap items-center gap-3 mb-4">
-        <input id="q" type="search" placeholder="Cari nama atau divisi" aria-label="Cari peserta"
-          class="flex-1 min-w-[12rem] bg-white border border-ink/15 rounded-xl px-4 py-3 focus:border-sky focus:outline-none">
-        <button onclick="$('qa').classList.toggle('hidden');$('qaText').focus()" class="px-4 py-3 rounded-xl bg-ink/5 font-medium hover:bg-ink/10">Tambah manual</button>
+        <input id="q" type="search" placeholder="Cari nama atau divisi peserta..." aria-label="Cari peserta"
+          class="flex-1 min-w-[12rem] bg-white border border-ink/15 rounded-xl px-4 py-3 focus:border-sky focus:outline-none shadow-sm">
+        <button onclick="$('qa').classList.toggle('hidden');$('qaText').focus()" class="px-4 py-3 rounded-xl bg-ink/5 font-medium hover:bg-ink/10 transition-colors">Tambah manual</button>
       </div>
-      <div id="qa" class="hidden mb-5 bg-white border border-ink/10 rounded-2xl p-4">
-        <label for="qaText" class="block font-medium mb-2">Tempel daftar nama, pisahkan dengan koma atau baris baru</label>
-        <textarea id="qaText" rows="3" placeholder="Budi, Siti, Andi" class="w-full border border-ink/15 rounded-xl p-3 focus:border-sky focus:outline-none"></textarea>
+
+      <div id="qa" class="hidden mb-5 bg-white border border-ink/10 rounded-2xl p-4 shadow-sm">
+        <label for="qaText" class="block font-medium mb-2">Tempel daftar nama peserta (pisahkan dengan koma atau baris baru):</label>
+        <textarea id="qaText" rows="3" placeholder="Budi Santoso, Siti Rahma, Andi Wijaya" class="w-full border border-ink/15 rounded-xl p-3 focus:border-sky focus:outline-none"></textarea>
         <div class="mt-3 flex gap-2">
           <button onclick="quickAdd()" class="px-5 py-2.5 rounded-xl bg-ink text-white font-medium hover:bg-sky">Tambahkan</button>
           <button onclick="$('qa').classList.add('hidden')" class="px-5 py-2.5 rounded-xl text-ink/70 hover:bg-ink/5">Tutup</button>
         </div>
       </div>
+
       <p id="empty" class="text-center text-ink/60 py-12"></p>
       <div id="cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
     </div>
   </section>
 
   <!-- Papan skor -->
-  <section id="board" data-tab="papan" class="hidden bg-ink text-white rounded-3xl p-6 md:p-12">
+  <section id="board" data-tab="papan" class="hidden bg-ink text-white rounded-3xl p-6 md:p-12 shadow-xl">
     <div class="flex items-start justify-between gap-4 mb-8 md:mb-12">
       <div>
         <h2 id="bTitle" class="font-display font-extrabold text-3xl md:text-6xl leading-tight"></h2>
-        <p class="text-white/60 md:text-xl mt-1">Papan skor partisipasi</p>
+        <p class="text-white/60 md:text-xl mt-1">Papan skor partisipasi & hasil kuis</p>
       </div>
       <div class="flex items-start gap-4">
         <div class="noproj flex flex-col gap-2">
@@ -114,9 +115,9 @@ tailwind.config = { theme: { extend: {
           <button onclick="window.open(location.href.split('#')[0]+'#papan','_blank')" class="px-4 py-2 rounded-full bg-white/10 text-sm font-medium hover:bg-white/20">Jendela baru</button>
         </div>
         <div class="text-center">
-          <div id="bQR" class="bg-white p-2 rounded-xl inline-block"></div>
-          <p id="bCode" class="font-display font-bold mt-1 md:text-xl"></p>
-          <p class="text-xs text-white/60">Pindai untuk daftar</p>
+          <div id="bQR" class="bg-white p-2 rounded-xl inline-block shadow"></div>
+          <p id="bCode" class="font-display font-bold mt-1 md:text-xl text-sun"></p>
+          <p class="text-xs text-white/60">Pindai untuk gabung</p>
         </div>
         <button id="exit" onclick="proj(false)" class="px-4 py-2 rounded-full bg-white/10 text-sm text-white/70 hover:bg-white/20">Keluar</button>
       </div>
@@ -124,345 +125,891 @@ tailwind.config = { theme: { extend: {
     <div id="bBody"></div>
   </section>
 
+  <!-- Kelola Kuis -->
+  <section data-tab="kuis" class="hidden">
+    <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+      <div>
+        <h2 class="font-display font-extrabold text-2xl md:text-3xl">Kelola Soal Kuis</h2>
+        <p class="text-ink/60">Soal-soal ini akan langsung tampil di HP peserta untuk dikerjakan dan dinilai secara otomatis.</p>
+      </div>
+      <button onclick="$('qForm').classList.toggle('hidden')" class="px-5 py-2.5 rounded-xl bg-sky text-white font-medium hover:brightness-95 transition-all">+ Tambah Soal Baru</button>
+    </div>
+
+    <!-- Form Tambah Soal -->
+    <div id="qForm" class="hidden bg-white border border-ink/10 rounded-2xl p-5 mb-6 shadow-sm space-y-4">
+      <h3 class="font-display font-bold text-xl">Buat Pertanyaan Baru</h3>
+      <div>
+        <label class="block text-sm font-medium mb-1">Pertanyaan / Soal:</label>
+        <textarea id="newQuestion" rows="2" placeholder="Contoh: Apa fungsi utama dari Emergency Shut Down (ESD) pada sistem bunker?" class="w-full border border-ink/15 rounded-xl p-3 focus:border-sky focus:outline-none"></textarea>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-sm font-medium mb-1">Pilihan A:</label>
+          <input id="opt0" type="text" placeholder="Pilihan A" class="w-full border border-ink/15 rounded-xl p-2.5 focus:border-sky focus:outline-none">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Pilihan B:</label>
+          <input id="opt1" type="text" placeholder="Pilihan B" class="w-full border border-ink/15 rounded-xl p-2.5 focus:border-sky focus:outline-none">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Pilihan C:</label>
+          <input id="opt2" type="text" placeholder="Pilihan C" class="w-full border border-ink/15 rounded-xl p-2.5 focus:border-sky focus:outline-none">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Pilihan D:</label>
+          <input id="opt3" type="text" placeholder="Pilihan D" class="w-full border border-ink/15 rounded-xl p-2.5 focus:border-sky focus:outline-none">
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">Kunci Jawaban Benar:</label>
+          <select id="newCorrect" class="w-full border border-ink/15 rounded-xl p-2.5 bg-white focus:border-sky focus:outline-none">
+            <option value="0">Pilihan A</option>
+            <option value="1">Pilihan B</option>
+            <option value="2">Pilihan C</option>
+            <option value="3">Pilihan D</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Poin Nilai:</label>
+          <input id="newPoints" type="number" value="10" class="w-full border border-ink/15 rounded-xl p-2.5 focus:border-sky focus:outline-none">
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Penjelasan / Pembahasan (Learning Notes):</label>
+        <input id="newExplanation" type="text" placeholder="Contoh: ESD memutus aliran bahan bakar seketika saat terjadi bahaya/kebocoran." class="w-full border border-ink/15 rounded-xl p-2.5 focus:border-sky focus:outline-none">
+      </div>
+      <div class="flex gap-2 pt-2">
+        <button onclick="saveQuestion()" class="px-5 py-2.5 rounded-xl bg-ink text-white font-medium hover:bg-sky">Simpan Soal ke Supabase</button>
+        <button onclick="$('qForm').classList.add('hidden')" class="px-5 py-2.5 rounded-xl text-ink/70 hover:bg-ink/5">Batal</button>
+      </div>
+    </div>
+
+    <div id="questionList" class="space-y-4"></div>
+  </section>
+
   <!-- Riwayat -->
   <section data-tab="riwayat" class="hidden">
-    <h2 class="font-display font-extrabold text-2xl mb-1">Riwayat poin</h2>
-    <p class="text-ink/60 mb-4">Terbaru di atas. Undo membatalkan satu catatan dan mengembalikan poinnya.</p>
-    <ul id="log" class="bg-white border border-ink/10 rounded-2xl px-4"></ul>
+    <h2 class="font-display font-extrabold text-2xl mb-1">Riwayat Poin & Kuis</h2>
+    <p class="text-ink/60 mb-4">Terbaru di atas. Undo membatalkan satu catatan poin dan menyinkronkan kembali database Supabase.</p>
+    <ul id="log" class="bg-white border border-ink/10 rounded-2xl px-4 divide-y divide-ink/10 shadow-sm"></ul>
   </section>
 </main>
 
 <!-- ================= TAMPILAN PESERTA (?kelas=KODE) ================= -->
 <main id="pv" class="max-w-md mx-auto p-4">
-  <p id="pCls" class="font-display font-extrabold text-2xl mb-4"></p>
-  <p id="pLoad" class="text-center text-ink/60 py-16">Memuat…</p>
-  <p id="pErr" class="hidden bg-coral/10 text-coral rounded-xl p-4">Kode kelas tidak ditemukan. Pindai ulang QR dari layar instruktur, atau pastikan Firebase sudah diisi di file ini.</p>
+  <div class="flex items-center justify-between mb-4">
+    <p id="pCls" class="font-display font-extrabold text-2xl text-ink"></p>
+    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-mint/10 text-mint">
+      <span class="w-1.5 h-1.5 rounded-full bg-mint animate-pulse"></span> Online
+    </span>
+  </div>
 
-  <form id="pReg" class="hidden space-y-4" onsubmit="daftar(event)">
-    <h2 class="font-display font-semibold text-xl">Daftar untuk ikut papan skor</h2>
-    <div>
-      <label for="rName" class="block font-medium mb-1">Nama lengkap</label>
-      <input id="rName" autocomplete="name" required class="w-full bg-white border border-ink/15 rounded-xl px-4 py-3.5 text-lg focus:border-sky focus:outline-none">
+  <p id="pLoad" class="text-center text-ink/60 py-16">Menghubungkan ke sesi Supabase…</p>
+  <p id="pErr" class="hidden bg-coral/10 text-coral rounded-xl p-4">Kode kelas tidak ditemukan. Silakan scan ulang barcode dari layar instruktur.</p>
+
+  <!-- Form Pendaftaran Peserta Baru -->
+  <form id="pReg" class="hidden bg-white border border-ink/10 rounded-3xl p-6 shadow-sm space-y-4" onsubmit="daftar(event)">
+    <div class="text-center pb-2">
+      <div class="w-12 h-12 rounded-2xl bg-sun/40 text-ink flex items-center justify-center mx-auto mb-3 font-display font-extrabold text-2xl">🎓</div>
+      <h2 class="font-display font-extrabold text-2xl">Daftar Pelatihan</h2>
+      <p class="text-sm text-ink/60 mt-1">Masukkan nama & divisi untuk mulai ikut kuis & papan skor kelas.</p>
     </div>
     <div>
-      <label for="rDiv" class="block font-medium mb-1">Divisi / Departemen</label>
-      <input id="rDiv" required class="w-full bg-white border border-ink/15 rounded-xl px-4 py-3.5 text-lg focus:border-sky focus:outline-none">
+      <label for="rName" class="block font-medium mb-1 text-sm">Nama Lengkap</label>
+      <input id="rName" autocomplete="name" placeholder="Contoh: Capt. Bambang" required class="w-full bg-paper border border-ink/15 rounded-xl px-4 py-3.5 text-base focus:border-sky focus:outline-none">
     </div>
-    <button class="w-full py-4 rounded-xl bg-sun font-bold text-lg hover:brightness-95">Daftar</button>
+    <div>
+      <label for="rDiv" class="block font-medium mb-1 text-sm">Divisi / Kapal / Departemen</label>
+      <input id="rDiv" placeholder="Contoh: Deck / Engine / ISM" required class="w-full bg-paper border border-ink/15 rounded-xl px-4 py-3.5 text-base focus:border-sky focus:outline-none">
+    </div>
+    <button class="w-full py-4 rounded-xl bg-sun font-bold text-lg hover:brightness-95 transition-all shadow text-ink">Masuk Kelas</button>
   </form>
 
+  <!-- Dashboard Peserta & Lembar Kuis -->
   <div id="pCard" class="hidden space-y-4">
-    <section class="bg-ink text-white rounded-3xl p-6">
-      <p id="pName" class="font-display font-semibold text-2xl"></p>
-      <p id="pDiv" class="text-white/60"></p>
-      <p class="mt-6 text-white/60">Total poin</p>
-      <p id="pPts" class="font-display font-extrabold text-8xl text-sun tabular-nums leading-none"></p>
-      <p id="pRank" class="mt-4"></p>
-    </section>
-    <section class="bg-white border border-ink/10 rounded-2xl p-4">
-      <h2 class="font-display font-semibold text-xl mb-1">Lima teratas</h2>
-      <ol id="pTop"></ol>
-    </section>
+    <!-- Tab Navigasi Peserta -->
+    <div class="flex bg-ink/5 p-1 rounded-2xl">
+      <button id="pTabScoreBtn" onclick="switchParticipantTab('score')" class="flex-1 py-2.5 rounded-xl font-bold text-sm bg-white shadow-sm text-ink transition-all">Poin Saya</button>
+      <button id="pTabQuizBtn" onclick="switchParticipantTab('quiz')" class="flex-1 py-2.5 rounded-xl font-medium text-sm text-ink/60 hover:text-ink transition-all">Kuis Learning (<span id="pQuizCount">0</span>)</button>
+    </div>
+
+    <!-- View Skor Peserta -->
+    <div id="pViewScore" class="space-y-4">
+      <section class="bg-ink text-white rounded-3xl p-6 shadow-lg relative overflow-hidden">
+        <div class="absolute -right-4 -bottom-4 w-32 h-32 rounded-full bg-white/5 pointer-events-none"></div>
+        <p id="pName" class="font-display font-bold text-2xl truncate"></p>
+        <p id="pDiv" class="text-white/60 text-sm"></p>
+        <p class="mt-6 text-white/60 text-xs uppercase tracking-wider font-semibold">Total Poin Terkumpul</p>
+        <p id="pPts" class="font-display font-extrabold text-7xl text-sun tabular-nums leading-none mt-1">0</p>
+        <p id="pRank" class="mt-4 text-sm text-white/80 font-medium"></p>
+      </section>
+
+      <section class="bg-white border border-ink/10 rounded-2xl p-4 shadow-sm">
+        <h3 class="font-display font-bold text-lg mb-2">5 Peserta Peringkat Teratas</h3>
+        <ol id="pTop" class="divide-y divide-ink/5"></ol>
+      </section>
+    </div>
+
+    <!-- View Kuis Peserta -->
+    <div id="pViewQuiz" class="hidden space-y-4">
+      <div id="pQuizList" class="space-y-4"></div>
+    </div>
   </div>
 </main>
 
-<div id="toast" role="status" aria-live="polite" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-ink text-white px-5 py-3 rounded-full shadow-lg opacity-0 pointer-events-none transition-opacity"></div>
+<div id="toast" role="status" aria-live="polite" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-ink text-white px-5 py-3 rounded-full shadow-2xl opacity-0 pointer-events-none transition-opacity text-sm z-50"></div>
 
+<!-- ================= 2. SCRIPT SUPABASE & LOGIKA UTAMA ================= -->
 <script>
-/* ============================================================
-   1. ISI FIREBASE CONFIG ANDA DI SINI
-   - console.firebase.google.com → buat project → Build → Realtime Database → Create database
-   - Project settings → Your apps → Web (</>) → salin nilai firebaseConfig ke bawah ini
-   - Realtime Database → Rules, tempel lalu Publish:
-       { "rules": { "sessions": { "$code": { ".read": true, ".write": true } } } }
-     (Daftar sesi tidak bisa dilihat, tapi siapa pun yang tahu kode sesi bisa menulis. Cukup untuk pelatihan; hapus sesi setelah selesai.)
-   Biarkan apiKey kosong untuk mode lokal (tanpa Firebase).
-   ============================================================ */
-const FIREBASE_CONFIG = {
-  apiKey: "",
-  authDomain: "",
-  databaseURL: "",   // contoh: https://nama-project-default-rtdb.asia-southeast1.firebasedatabase.app
-  projectId: "",
-  appId: ""
+const SUPABASE_URL = "https://igwpmnwgktjrwkqlkznj.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlnd3Btbndna3RqcndrcWxrem5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI3NDAyNTcsImV4cCI6MjEwODMxNjI1N30.R7HGXqFeuswI73g2UkO3xWLHCgBI99SWpoT8hHlPSzk";
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const $ = id => document.getElementById(id);
+const ls = {
+  get: k => { try { return localStorage.getItem(k); } catch(e){ return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch(e){} }
 };
 
-/* ===================== 2. UTILITAS ===================== */
-const $ = id => document.getElementById(id);
-const ls = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
 const CATS = {
-  ask:   { l:'Bertanya', p:5,  c:'bg-sky/10 text-sky hover:bg-sky hover:text-white' },
-  crit:  { l:'Kritis',   p:10, c:'bg-mint/10 text-mint hover:bg-mint hover:text-white' },
-  ans:   { l:'Menjawab', p:5,  c:'bg-sun/30 text-ink hover:bg-sun' },
-  minus: { l:'Kurangi',  p:-2, c:'bg-coral/10 text-coral hover:bg-coral hover:text-white' }
+  quiz:  { l:'Kuis Benar', p:10, c:'bg-mint/10 text-mint' },
+  ask:   { l:'Bertanya',   p:5,  c:'bg-sky/10 text-sky hover:bg-sky hover:text-white' },
+  crit:  { l:'Kritis',     p:10, c:'bg-mint/10 text-mint hover:bg-mint hover:text-white' },
+  ans:   { l:'Menjawab',   p:5,  c:'bg-sun/30 text-ink hover:bg-sun' },
+  minus: { l:'Kurangi',    p:-2, c:'bg-coral/10 text-coral hover:bg-coral hover:text-white' }
 };
-const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+const esc = s => String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const sg = n => (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n);
 const fmt = t => new Date(t).toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
 const norm = c => String(c || '').toUpperCase().replace(/[^A-Z0-9-]/g, '');
 
 const qs = new URLSearchParams(location.search);
-const PMODE = qs.has('kelas');                       // ?kelas=KODE → tampilan peserta
-let code = norm(PMODE ? qs.get('kelas') : ls.get('gcpt.code'));
-let S = {}, loaded = false, prevIds = null, q = '', tt, ct, lastQR = '', unsub = () => {};
-let meId = PMODE ? ls.get('gcpt.me.' + code) : null;
+const PMODE = qs.has('kelas');
+let code = norm(PMODE ? qs.get('kelas') : ls.get('quiz.code'));
+let currentSession = null;
+let participants = [];
+let pointLogs = [];
+let questions = [];
+let submissions = [];
+let meId = PMODE ? ls.get('quiz.me.' + code) : null;
+let lastQR = '';
+let tt, ct;
+
 if (PMODE) document.body.classList.add('p');
 
-/* ===================== 3. DATA (Firebase / lokal) ===================== */
-let FB = !!(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.databaseURL && typeof firebase !== 'undefined'), db;
-try { if (FB) { firebase.initializeApp(FIREBASE_CONFIG); db = firebase.database(); } } catch (e) { FB = false; }
-const lkey = c => 'gcpt.s.' + c;
-const fref = p => db.ref('sessions/' + code + (p ? '/' + p : ''));
-
-// Struktur: sessions/KODE/{ meta:{cls,created}, people:{id:{name,divisi,t,via}}, log:{id:{pid,name,cat,pts,t}} }
-function put(path, val) {
-  if (FB) return fref(path).set(val).catch(e => toast('Gagal menyimpan: ' + e.message));
-  const k = path.split('/'), last = k.pop(); let o = S;
-  k.forEach(x => o = o[x] = o[x] || {});
-  val === null ? delete o[last] : o[last] = val;
-  ls.set(lkey(code), JSON.stringify(S)); render();
-}
-function watch() {
-  unsub(); unsub = () => {};
-  if (!code) { loaded = true; return render(); }
-  if (FB) {
-    const r = fref(), h = r.on('value', s => onData(s.val()), e => toast('Koneksi gagal: ' + e.message));
-    unsub = () => r.off('value', h);
-  } else onData(JSON.parse(ls.get(lkey(code)) || 'null'));
-}
-function onData(d) {
-  S = d || {};
-  const ids = Object.keys(S.people || {});
-  if (loaded && prevIds && !PMODE) ids.filter(i => !prevIds.includes(i) && S.people[i].via === 'mandiri').forEach(i => toast(S.people[i].name + ' baru mendaftar'));
-  prevIds = ids; loaded = true; render();
-}
-const exists = c => FB ? db.ref('sessions/' + c + '/meta').once('value').then(s => s.exists()) : Promise.resolve(!!ls.get(lkey(c)));
-function setCode(c) { code = c; ls.set('gcpt.code', c); S = {}; loaded = false; prevIds = null; watch(); }
-window.addEventListener('storage', e => { if (!FB && e.key === lkey(code)) watch(); });
-
-const P = () => Object.entries(S.people || {}).map(([id, p]) => ({ id, ...p }));
-const L = () => Object.entries(S.log || {}).map(([id, l]) => ({ id, ...l })).sort((a, b) => a.t - b.t);
-function ranked() {
-  const m = {}, ps = P(); ps.forEach(p => m[p.id] = 0);
-  L().forEach(l => { if (l.pid in m) m[l.pid] += l.pts; });
-  const a = ps.map(p => ({ ...p, pts: m[p.id] })).sort((x, y) => y.pts - x.pts || x.name.localeCompare(y.name, 'id'));
-  let r = 0; a.forEach((p, i) => { if (!i || p.pts !== a[i-1].pts) r = i + 1; p.rank = r; });
-  return a;
+/* ================= 3. TOAST & NOTIFIKASI ================= */
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.style.opacity = 1;
+  clearTimeout(tt);
+  tt = setTimeout(() => t.style.opacity = 0, 2200);
 }
 
-/* ===================== 4. SESI & QR ===================== */
+/* ================= 4. SUPABASE DATA LAYER ================= */
+async function loadAllData() {
+  if (!code) {
+    currentSession = null;
+    participants = [];
+    pointLogs = [];
+    questions = [];
+    render();
+    return;
+  }
+
+  // 1. Ambil data Sesi
+  const { data: sesData, error: sErr } = await db.from('quiz_sessions').select('*').eq('code', code).maybeSingle();
+  if (sErr || !sesData) {
+    currentSession = null;
+    render();
+    return;
+  }
+  currentSession = sesData;
+
+  // 2. Ambil Peserta
+  const { data: pData } = await db.from('quiz_participants').select('*').eq('session_code', code).order('total_points', { ascending: false });
+  participants = pData || [];
+
+  // 3. Ambil Log Poin
+  const { data: lData } = await db.from('quiz_point_logs').select('*').eq('session_code', code).order('created_at', { ascending: false });
+  pointLogs = lData || [];
+
+  // 4. Ambil Soal Kuis
+  const { data: qData } = await db.from('quiz_questions').select('*').eq('session_code', code).order('order_num', { ascending: true });
+  questions = qData || [];
+
+  // 5. Ambil Submisi Kuis jika mode peserta
+  if (meId) {
+    const { data: subData } = await db.from('quiz_submissions').select('*').eq('session_code', code).eq('participant_id', meId);
+    submissions = subData || [];
+  }
+
+  render();
+}
+
+// Berlangganan perubahan data realtime Supabase
+let realtimeChannel = null;
+function setupRealtime() {
+  if (realtimeChannel) {
+    db.removeChannel(realtimeChannel);
+  }
+  if (!code) return;
+
+  realtimeChannel = db.channel('quiz-sync-' + code)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'quiz_participants', filter: `session_code=eq.${code}` }, () => loadAllData())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'quiz_point_logs', filter: `session_code=eq.${code}` }, () => loadAllData())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'quiz_questions', filter: `session_code=eq.${code}` }, () => loadAllData())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'quiz_sessions', filter: `code=eq.${code}` }, () => loadAllData())
+    .subscribe();
+}
+
+function setCode(c) {
+  code = c;
+  ls.set('quiz.code', c);
+  setupRealtime();
+  loadAllData();
+}
+
+/* ================= 5. KELOLA SESI & QR ================= */
 const base = () => $('baseUrl').value.trim() || location.href.split(/[?#]/)[0];
 const joinUrl = () => base() + '?kelas=' + code;
+
 function drawQR(el, size) {
   el.innerHTML = '';
   if (typeof QRCode === 'undefined') { el.textContent = 'QR gagal dimuat'; return; }
   new QRCode(el, { text: joinUrl(), width: size, height: size, colorDark: '#16213E', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
 }
+
 async function newSession() {
-  const A = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'; let c;
-  try {
-    do { c = 'KELAS-' + Array.from({ length: 4 }, () => A[Math.random() * A.length | 0]).join(''); } while (await exists(c));
-    code = c; S = {};
-    await put('meta', { cls: $('cls').value.trim(), created: Date.now() });
-    setCode(c); toast('Sesi ' + c + ' dibuat');
-  } catch (e) { toast('Gagal membuat sesi: ' + e.message); }
+  const chars = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+  let c = 'KELAS-' + Array.from({ length: 4 }, () => chars[Math.random() * chars.length | 0]).join('');
+  const title = $('cls').value.trim() || 'Pelatihan Baru';
+
+  const { data, error } = await db.from('quiz_sessions').insert([{ code: c, title: title, is_active: true }]).select().single();
+  if (error) {
+    toast('Gagal membuat sesi: ' + error.message);
+    return;
+  }
+
+  // Masukkan 3 contoh soal kuis default (ISM & Maritime Safety)
+  await insertDefaultQuestions(c);
+
+  setCode(c);
+  toast(`Sesi ${c} berhasil dibuat!`);
 }
+
+async function insertDefaultQuestions(sessionCode) {
+  const defaultQuestions = [
+    {
+      session_code: sessionCode,
+      question: "Apa tujuan utama pelaksanaan Fire Drill secara berkala di atas kapal sesuai ISM Code?",
+      options: [
+        "Memenuhi formalitas administrasi port authority",
+        "Melatih kesiapsiagaan, reaksi cepat, dan kerja sama tim kru menghadapi situasi darurat",
+        "Menghabiskan masa berlaku tabung pemadam api",
+        "Mengurangi jam istirahat kru kapal"
+      ],
+      correct_index: 1,
+      points: 10,
+      explanation: "Fire Drill bertujuan membangun reflek dan kesiapsiagaan kru agar prosedur evakuasi dan pemadaman berjalan otomatis saat bahaya nyata.",
+      order_num: 1
+    },
+    {
+      session_code: sessionCode,
+      question: "Tindakan pertama yang wajib dilakukan saat menemukan tumpahan minyak di geladak saat bunkering adalah?",
+      options: [
+        "Menyiram tumpahan dengan air bertekanan tinggi",
+        "Mengaktifkan Emergency Stop (ESD) dan menghentikan transfer minyak seketika",
+        "Mengabaikan jika jumlahnya kurang dari 5 liter",
+        "Menunggu perintah dari agen pelabuhan"
+      ],
+      correct_index: 1,
+      points: 10,
+      explanation: "Langkah pertama adalah isolasi sumber bahaya dengan menekan ESD (Emergency Stop) untuk memutus aliran minyak sebelum tindakan penanggulangan (SOPEP).",
+      order_num: 2
+    },
+    {
+      session_code: sessionCode,
+      question: "Di bawah SOLAS & ISM Code, berapa batas waktu maksimal untuk meluncurkan sekoci penolong (Lifeboat) lengkap dengan kru?",
+      options: [
+        "10 menit sejak perintah evakuasi diberikan",
+        "30 menit sejak perintah evakuasi diberikan",
+        "45 menit sejak perintah evakuasi diberikan",
+        "60 menit sejak perintah evakuasi diberikan"
+      ],
+      correct_index: 0,
+      points: 10,
+      explanation: "Sesuai regulasi SOLAS, sekoci penyelamat harus siap diluncurkan beserta seluruh penumpangnya dalam waktu maksimal 10 menit.",
+      order_num: 3
+    }
+  ];
+
+  await db.from('quiz_questions').insert(defaultQuestions);
+}
+
 async function joinSession() {
-  const c = norm($('joinCode').value); if (!c) return;
-  try { if (!(await exists(c))) return toast('Kode sesi tidak ditemukan'); } catch (e) { return toast('Gagal: ' + e.message); }
-  $('joinCode').value = ''; setCode(c);
+  const c = norm($('joinCode').value);
+  if (!c) return;
+  const { data, error } = await db.from('quiz_sessions').select('code').eq('code', c).maybeSingle();
+  if (error || !data) return toast('Kode sesi tidak ditemukan di Supabase');
+  $('joinCode').value = '';
+  setCode(c);
 }
+
 async function endSession() {
-  if (!confirm('Hapus sesi ' + code + ' beserta semua peserta dan riwayatnya? Ekspor CSV dulu jika perlu.')) return;
-  try { if (FB) await fref().remove(); else localStorage.removeItem(lkey(code)); } catch (e) {}
+  if (!confirm(`Hapus sesi ${code} beserta semua data peserta, soal, dan skor di Supabase?`)) return;
+  await db.from('quiz_sessions').delete().eq('code', code);
   setCode('');
+  toast('Sesi berhasil dihapus');
 }
+
 function copyLink() {
   (navigator.clipboard ? navigator.clipboard.writeText(joinUrl()) : Promise.reject())
-    .then(() => toast('Tautan disalin'), () => prompt('Salin tautan ini:', joinUrl()));
+    .then(() => toast('Tautan pendaftaran disalin!'), () => prompt('Salin tautan ini:', joinUrl()));
 }
 
-/* ===================== 5. AKSI ===================== */
-function toast(msg) { const t = $('toast'); t.textContent = msg; t.style.opacity = 1; clearTimeout(tt); tt = setTimeout(() => t.style.opacity = 0, 1800); }
-function award(pid, cat) {
-  const p = (S.people || {})[pid]; if (!p) return;
-  put('log/' + uid(), { pid, name: p.name, cat, pts: CATS[cat].p, t: Date.now() });
-  toast(`${p.name} ${sg(CATS[cat].p)} ${CATS[cat].l}`);
+/* ================= 6. AKSI POIN & KUIS ================= */
+async function award(pid, cat) {
+  const p = participants.find(x => x.id === pid);
+  if (!p) return;
+  const pts = CATS[cat].p;
+
+  // 1. Simpan ke log
+  await db.from('quiz_point_logs').insert([{
+    session_code: code,
+    participant_id: pid,
+    category: cat,
+    points: pts,
+    description: CATS[cat].l
+  }]);
+
+  // 2. Update total poin peserta
+  const newTotal = (p.total_points || 0) + pts;
+  await db.from('quiz_participants').update({ total_points: newTotal }).eq('id', pid);
+
+  toast(`${p.name} ${sg(pts)} ${CATS[cat].l}`);
+  loadAllData();
 }
-function undo(id) { const l = (S.log || {})[id]; if (!l) return; put('log/' + id, null); toast(`Dibatalkan: ${l.name} ${sg(l.pts)}`); }
-function editP(id) {
-  const p = S.people[id]; if (!p) return;
-  const n = prompt('Nama lengkap:', p.name); if (n === null) return;
-  const d = prompt('Divisi / Departemen:', p.divisi || ''); if (d === null) return;
-  if (n.trim()) put('people/' + id, { ...p, name: n.trim(), divisi: d.trim() });
+
+async function undo(logId) {
+  const l = pointLogs.find(x => x.id === logId);
+  if (!l) return;
+
+  // Kembalikan poin peserta
+  const p = participants.find(x => x.id === l.participant_id);
+  if (p) {
+    const reverted = (p.total_points || 0) - l.points;
+    await db.from('quiz_participants').update({ total_points: reverted }).eq('id', p.id);
+  }
+
+  // Hapus log
+  await db.from('quiz_point_logs').delete().eq('id', logId);
+  toast(`Dibatalkan: ${l.description} (${sg(l.points)})`);
+  loadAllData();
 }
-function delP(id) {
-  const p = S.people[id]; if (!p || !confirm(`Hapus ${p.name} beserta riwayat poinnya?`)) return;
-  L().forEach(l => { if (l.pid === id) put('log/' + l.id, null); });
-  put('people/' + id, null);
+
+async function delP(id) {
+  const p = participants.find(x => x.id === id);
+  if (!p || !confirm(`Hapus peserta ${p.name}?`)) return;
+  await db.from('quiz_participants').delete().eq('id', id);
+  toast(`${p.name} dihapus`);
+  loadAllData();
 }
-function quickAdd() {
-  const ex = new Set(P().map(p => p.name.toLowerCase())); let n = 0;
-  $('qaText').value.split(/[,;\n]+/).map(s => s.trim()).filter(Boolean).forEach((nm, i) => {
-    if (!ex.has(nm.toLowerCase())) { ex.add(nm.toLowerCase()); put('people/' + uid(), { name: nm, divisi: '', t: Date.now() + i }); n++; }
-  });
-  $('qaText').value = ''; toast(n ? `${n} peserta ditambahkan` : 'Tidak ada nama baru');
+
+async function editP(id) {
+  const p = participants.find(x => x.id === id);
+  if (!p) return;
+  const n = prompt('Nama lengkap:', p.name);
+  if (n === null) return;
+  const d = prompt('Divisi / Departemen:', p.division || '');
+  if (d === null) return;
+  if (n.trim()) {
+    await db.from('quiz_participants').update({ name: n.trim(), division: d.trim() }).eq('id', id);
+    loadAllData();
+  }
 }
-function daftar(e) {
+
+async function quickAdd() {
+  const raw = $('qaText').value.split(/[,;\n]+/).map(s => s.trim()).filter(Boolean);
+  if (!raw.length) return;
+  const inserts = raw.map(name => ({
+    session_code: code,
+    name: name,
+    division: 'Manual',
+    total_points: 0
+  }));
+  const { error } = await db.from('quiz_participants').insert(inserts);
+  if (error) toast('Gagal menambah peserta: ' + error.message);
+  else {
+    $('qaText').value = '';
+    $('qa').classList.add('hidden');
+    toast(`${inserts.length} peserta ditambahkan`);
+    loadAllData();
+  }
+}
+
+async function daftar(e) {
   e.preventDefault();
-  const n = $('rName').value.trim(), d = $('rDiv').value.trim();
-  if (!n || !d) return toast('Isi nama dan divisi');
-  if (P().some(p => p.name.toLowerCase() === n.toLowerCase())) return toast('Nama sudah terdaftar. Tambahkan nama belakang atau inisial.');
-  meId = uid(); ls.set('gcpt.me.' + code, meId);
-  put('people/' + meId, { name: n, divisi: d, t: Date.now(), via: 'mandiri' });
+  const n = $('rName').value.trim();
+  const d = $('rDiv').value.trim();
+  if (!n || !d) return toast('Harap lengkapi nama dan divisi');
+
+  const { data, error } = await db.from('quiz_participants').insert([{
+    session_code: code,
+    name: n,
+    division: d,
+    total_points: 0
+  }]).select().single();
+
+  if (error) {
+    if (error.code === '23505') {
+      toast('Nama sudah terdaftar di kelas ini. Gunakan nama lengkap / inisial.');
+    } else {
+      toast('Gagal mendaftar: ' + error.message);
+    }
+    return;
+  }
+
+  meId = data.id;
+  ls.set('quiz.me.' + code, meId);
+  toast('Berhasil bergabung!');
+  loadAllData();
 }
 
-/* ===================== 6. TAMPILAN ===================== */
+async function saveQuestion() {
+  const q = $('newQuestion').value.trim();
+  const opts = [
+    $('opt0').value.trim(),
+    $('opt1').value.trim(),
+    $('opt2').value.trim(),
+    $('opt3').value.trim()
+  ];
+  const correct = parseInt($('newCorrect').value, 10);
+  const pts = parseInt($('newPoints').value, 10) || 10;
+  const exp = $('newExplanation').value.trim();
+
+  if (!q || opts.some(o => !o)) return toast('Lengkapi pertanyaan dan semua 4 pilihan jawaban');
+
+  const { error } = await db.from('quiz_questions').insert([{
+    session_code: code,
+    question: q,
+    options: opts,
+    correct_index: correct,
+    points: pts,
+    explanation: exp,
+    order_num: questions.length + 1
+  }]);
+
+  if (error) toast('Gagal menyimpan soal: ' + error.message);
+  else {
+    $('newQuestion').value = '';
+    $('opt0').value = ''; $('opt1').value = ''; $('opt2').value = ''; $('opt3').value = '';
+    $('newExplanation').value = '';
+    $('qForm').classList.add('hidden');
+    toast('Soal kuis berhasil ditambahkan!');
+    loadAllData();
+  }
+}
+
+async function deleteQuestion(qid) {
+  if (!confirm('Hapus soal ini?')) return;
+  await db.from('quiz_questions').delete().eq('id', qid);
+  toast('Soal dihapus');
+  loadAllData();
+}
+
+async function submitAnswer(questionId, selectedIdx) {
+  if (!meId) return toast('Harap daftar terlebih dahulu');
+  const q = questions.find(x => x.id === questionId);
+  const p = participants.find(x => x.id === meId);
+  if (!q || !p) return;
+
+  const isCorrect = (selectedIdx === q.correct_index);
+  const pts = isCorrect ? q.points : 0;
+
+  // 1. Simpan submisi ke database
+  const { data, error } = await db.from('quiz_submissions').insert([{
+    session_code: code,
+    question_id: questionId,
+    participant_id: meId,
+    selected_index: selectedIdx,
+    is_correct: isCorrect,
+    points_awarded: pts
+  }]).select().single();
+
+  if (error) {
+    return toast('Anda sudah menjawab soal ini');
+  }
+
+  // 2. Jika benar, beri poin dan catat log
+  if (isCorrect && pts > 0) {
+    await db.from('quiz_point_logs').insert([{
+      session_code: code,
+      participant_id: meId,
+      category: 'quiz',
+      points: pts,
+      description: `Kuis: ${q.question.slice(0, 30)}...`
+    }]);
+
+    await db.from('quiz_participants').update({
+      total_points: (p.total_points || 0) + pts
+    }).eq('id', meId);
+
+    toast(`🎉 Jawaban Benar! +${pts} Poin`);
+  } else {
+    toast(`Jawaban belum tepat. Pelajari pembahasannya!`);
+  }
+
+  loadAllData();
+}
+
+/* ================= 7. TAMPILAN & RENDER ================= */
 function setTab(t) {
   document.querySelectorAll('[data-tab]').forEach(e => e.classList.toggle('hidden', e.dataset.tab !== t));
   document.querySelectorAll('.tab').forEach(b => {
     const on = b.dataset.go === t;
-    b.classList.toggle('bg-ink', on); b.classList.toggle('text-white', on); b.classList.toggle('text-ink/70', !on);
+    b.classList.toggle('bg-ink', on);
+    b.classList.toggle('text-white', on);
+    b.classList.toggle('text-ink/70', !on);
     on ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current');
   });
 }
+
 function proj(on) {
   document.body.classList.toggle('proj', on);
-  if (on) { try { document.documentElement.requestFullscreen()?.catch(() => {}); } catch (e) {} }
-  else if (document.fullscreenElement) document.exitFullscreen();
+  if (on) {
+    try { document.documentElement.requestFullscreen()?.catch(() => {}); } catch (e) {}
+  } else if (document.fullscreenElement) {
+    document.exitFullscreen();
+  }
 }
-document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) document.body.classList.remove('proj'); });
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement) document.body.classList.remove('proj');
+});
+
+function getRankedList() {
+  const sorted = [...participants].sort((a, b) => (b.total_points || 0) - (a.total_points || 0) || a.name.localeCompare(b.name, 'id'));
+  let r = 0;
+  sorted.forEach((p, i) => {
+    if (!i || p.total_points !== sorted[i-1].total_points) r = i + 1;
+    p.rank = r;
+  });
+  return sorted;
+}
 
 function renderCards() {
-  const m = {}; ranked().forEach(p => m[p.id] = p);
-  const k = q.trim().toLowerCase();
-  const all = P().sort((a, b) => (a.t || 0) - (b.t || 0) || a.name.localeCompare(b.name, 'id'));
-  const list = all.filter(p => (p.name + ' ' + (p.divisi || '')).toLowerCase().includes(k));
-  $('cards').innerHTML = list.map(p => { const x = m[p.id]; return `
-    <article class="bg-white border border-ink/10 rounded-2xl p-4 flex flex-col gap-3">
+  const rList = getRankedList();
+  const search = ($('q').value || '').trim().toLowerCase();
+  const list = rList.filter(p => (p.name + ' ' + (p.division || '')).toLowerCase().includes(search));
+
+  $('cards').innerHTML = list.map(p => `
+    <article class="bg-white border border-ink/10 rounded-2xl p-4 flex flex-col gap-3 shadow-sm hover:shadow transition-shadow">
       <div class="flex items-start justify-between gap-2">
         <div class="min-w-0">
-          <h3 class="font-display font-semibold text-xl truncate">${esc(p.name)}</h3>
-          <p class="text-sm text-ink/60 truncate">${esc(p.divisi || 'Tanpa divisi')}, peringkat ${x.rank}</p>
+          <h3 class="font-display font-semibold text-xl truncate text-ink">${esc(p.name)}</h3>
+          <p class="text-xs text-ink/60 truncate">${esc(p.division || 'Tanpa divisi')} • Peringkat ${p.rank}</p>
         </div>
         <div class="flex shrink-0">
-          <button data-edit="${p.id}" aria-label="Edit ${esc(p.name)}" class="text-ink/40 hover:text-sky px-1.5">✎</button>
-          <button data-del="${p.id}" aria-label="Hapus ${esc(p.name)}" class="text-ink/40 hover:text-coral px-1.5">✕</button>
+          <button onclick="editP('${p.id}')" aria-label="Edit" class="text-ink/40 hover:text-sky px-1">✎</button>
+          <button onclick="delP('${p.id}')" aria-label="Hapus" class="text-ink/40 hover:text-coral px-1">✕</button>
         </div>
       </div>
-      <div class="font-display font-extrabold text-5xl tabular-nums">${x.pts}</div>
-      <div class="grid grid-cols-2 gap-2">
-        ${Object.entries(CATS).map(([c, v]) => `<button data-a="${c}" data-id="${p.id}" class="min-h-[44px] rounded-xl text-sm font-bold transition-colors ${v.c}">${sg(v.p)} ${v.l}</button>`).join('')}
+      <div class="font-display font-extrabold text-5xl tabular-nums text-sky">${p.total_points || 0}</div>
+      <div class="grid grid-cols-2 gap-2 mt-auto">
+        ${Object.entries(CATS).filter(([k]) => k !== 'quiz').map(([c, v]) => `
+          <button onclick="award('${p.id}', '${c}')" class="min-h-[40px] rounded-xl text-xs font-bold transition-all shadow-sm ${v.c}">
+            ${sg(v.p)} ${v.l}
+          </button>
+        `).join('')}
       </div>
-    </article>`; }).join('');
-  $('empty').textContent = !all.length ? 'Belum ada peserta. Minta peserta memindai QR di atas, atau klik “Tambah manual”.'
-    : !list.length ? `Tidak ada peserta yang cocok dengan “${q}”.` : '';
+    </article>
+  `).join('');
+
+  $('empty').textContent = !participants.length
+    ? 'Belum ada peserta terdaftar. Minta peserta scan QR code di atas.'
+    : !list.length ? `Tidak ada peserta yang cocok dengan “${search}”.` : '';
 }
 
 function renderBoard() {
-  $('bTitle').textContent = (S.meta && S.meta.cls) || 'Papan Skor';
-  const r = ranked(), mx = Math.max(1, ...r.map(p => p.pts));
-  if (!r.length) { $('bBody').innerHTML = '<p class="text-white/60 text-xl">Menunggu peserta mendaftar…</p>'; return; }
+  $('bTitle').textContent = (currentSession && currentSession.title) || 'Papan Skor';
+  const r = getRankedList();
+  const mx = Math.max(1, ...r.map(p => p.total_points || 0));
+
+  if (!r.length) {
+    $('bBody').innerHTML = '<p class="text-white/60 text-xl py-12 text-center">Menunggu peserta memindai QR dan mendaftar…</p>';
+    return;
+  }
+
   const top = r.slice(0, 5).map(p => `
-    <li class="grid grid-cols-[3rem_1fr_auto] md:grid-cols-[5rem_1fr_auto] items-center gap-3 md:gap-6">
+    <li class="grid grid-cols-[3rem_1fr_auto] md:grid-cols-[5rem_1fr_auto] items-center gap-3 md:gap-6 bg-white/5 p-4 rounded-2xl">
       <span class="font-display font-extrabold text-4xl md:text-7xl text-right ${p.rank === 1 ? 'text-sun' : 'text-white/50'}">${p.rank}</span>
       <div class="min-w-0">
-        <p class="font-display font-semibold text-xl md:text-4xl truncate">${esc(p.name)}</p>
+        <p class="font-display font-semibold text-xl md:text-4xl truncate text-white">${esc(p.name)}</p>
+        <p class="text-sm text-white/50">${esc(p.division || '')}</p>
         <div class="mt-2 h-3 md:h-4 rounded-full bg-white/10 overflow-hidden">
-          <div class="grow h-full rounded-full ${p.rank === 1 ? 'bg-sun' : 'bg-[#8DA5FF]'}" style="width:${Math.max(0, p.pts) / mx * 100}%"></div>
+          <div class="grow h-full rounded-full ${p.rank === 1 ? 'bg-sun' : 'bg-sky'}" style="width:${Math.max(0, p.total_points || 0) / mx * 100}%"></div>
         </div>
       </div>
-      <span class="font-display font-extrabold text-3xl md:text-6xl tabular-nums">${p.pts}</span>
-    </li>`).join('');
+      <span class="font-display font-extrabold text-3xl md:text-6xl tabular-nums text-sun">${p.total_points || 0}</span>
+    </li>
+  `).join('');
+
   const rest = r.slice(5).map(p => `
     <li class="flex items-baseline gap-3 py-2 border-b border-white/10">
       <span class="w-8 text-right text-white/50 tabular-nums md:text-xl">${p.rank}</span>
-      <span class="flex-1 truncate text-lg md:text-2xl">${esc(p.name)}</span>
-      <span class="font-display font-bold text-xl md:text-2xl tabular-nums">${p.pts}</span>
-    </li>`).join('');
-  $('bBody').innerHTML = `<ol class="space-y-5 md:space-y-8">${top}</ol>` + (rest ? `
-    <h3 class="font-display font-semibold text-xl md:text-3xl mt-12 mb-3 text-white/70">Peserta lainnya</h3>
-    <ol class="grid md:grid-cols-2 xl:grid-cols-3 gap-x-10">${rest}</ol>` : '');
+      <span class="flex-1 truncate text-lg md:text-xl text-white/90">${esc(p.name)}</span>
+      <span class="font-display font-bold text-xl tabular-nums text-sun/90">${p.total_points || 0}</span>
+    </li>
+  `).join('');
+
+  $('bBody').innerHTML = `<ol class="space-y-4">${top}</ol>` + (rest ? `
+    <h3 class="font-display font-semibold text-xl md:text-2xl mt-10 mb-3 text-white/70">Peserta Lainnya</h3>
+    <ol class="grid md:grid-cols-2 xl:grid-cols-3 gap-x-10">${rest}</ol>
+  ` : '');
+}
+
+function renderQuestions() {
+  if (!$('questionList')) return;
+  if (!questions.length) {
+    $('questionList').innerHTML = '<p class="text-center text-ink/60 py-10">Belum ada soal kuis. Klik "+ Tambah Soal Baru" di atas.</p>';
+    return;
+  }
+
+  $('questionList').innerHTML = questions.map((q, idx) => `
+    <div class="bg-white border border-ink/10 rounded-2xl p-5 shadow-sm space-y-3">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex items-center gap-2">
+          <span class="w-7 h-7 rounded-full bg-sky/10 text-sky font-bold text-sm flex items-center justify-center">${idx + 1}</span>
+          <h4 class="font-display font-bold text-lg text-ink">${esc(q.question)}</h4>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sun/30 text-ink">+${q.points} Poin</span>
+          <button onclick="deleteQuestion('${q.id}')" class="text-coral hover:bg-coral/10 p-1 rounded-lg text-sm">Hapus</button>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+        ${(q.options || []).map((opt, i) => `
+          <div class="p-2.5 rounded-xl border ${i === q.correct_index ? 'border-mint bg-mint/5 font-semibold text-mint' : 'border-ink/10 text-ink/70'}">
+            <span class="font-bold mr-1">${['A','B','C','D'][i]}.</span> ${esc(opt)}
+            ${i === q.correct_index ? ' ✓ (Kunci)' : ''}
+          </div>
+        `).join('')}
+      </div>
+      ${q.explanation ? `<p class="text-xs text-ink/60 bg-paper p-2.5 rounded-xl"><b>Pembahasan:</b> ${esc(q.explanation)}</p>` : ''}
+    </div>
+  `).join('');
 }
 
 function renderLog() {
-  const rows = L().reverse();
-  $('log').innerHTML = rows.length ? rows.map(l => `
-    <li class="flex items-center gap-3 py-3 border-b border-ink/10 last:border-0">
-      <time class="text-sm text-ink/60 tabular-nums w-[5.5rem] shrink-0">${fmt(l.t)}</time>
-      <span class="font-medium flex-1 truncate">${esc(((S.people || {})[l.pid] || {}).name || l.name)}</span>
-      <span class="hidden sm:inline text-sm px-3 py-0.5 rounded-full bg-ink/5">${CATS[l.cat].l}</span>
-      <span class="font-display font-bold w-12 text-right ${l.pts < 0 ? 'text-coral' : 'text-mint'}">${sg(l.pts)}</span>
-      <button data-undo="${l.id}" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-ink/5 hover:bg-coral hover:text-white">Undo</button>
-    </li>`).join('') : '<li class="py-10 text-center text-ink/60">Belum ada catatan. Beri poin dari tab Peserta.</li>';
+  $('log').innerHTML = pointLogs.length ? pointLogs.map(l => {
+    const p = participants.find(x => x.id === l.participant_id) || {};
+    return `
+      <li class="flex items-center gap-3 py-3">
+        <time class="text-xs text-ink/60 tabular-nums w-16 shrink-0">${fmt(l.created_at)}</time>
+        <span class="font-medium flex-1 truncate text-ink">${esc(p.name || 'Peserta')}</span>
+        <span class="text-xs px-2.5 py-1 rounded-full bg-ink/5 text-ink/70">${esc(l.description || l.category)}</span>
+        <span class="font-display font-bold w-12 text-right ${l.points < 0 ? 'text-coral' : 'text-mint'}">${sg(l.points)}</span>
+        <button onclick="undo('${l.id}')" class="px-3 py-1 rounded-lg text-xs font-medium bg-ink/5 hover:bg-coral hover:text-white transition-colors">Undo</button>
+      </li>
+    `;
+  }).join('') : '<li class="py-10 text-center text-ink/60">Belum ada aktivitas poin tercatat.</li>';
 }
 
-function renderA() {
-  const has = !!(code && S.meta);
-  $('noSes').classList.toggle('hidden', has); $('ses').classList.toggle('hidden', !has);
-  $('modeNote').classList.toggle('hidden', FB);
-  if (has && document.activeElement !== $('cls')) $('cls').value = S.meta.cls || '';
+function renderInstructor() {
+  const has = !!(code && currentSession);
+  $('noSes').classList.toggle('hidden', has);
+  $('ses').classList.toggle('hidden', !has);
+
+  if (has && document.activeElement !== $('cls')) {
+    $('cls').value = currentSession.title || '';
+  }
+
   const u = has ? joinUrl() : '';
-  if (u !== lastQR) { lastQR = u; if (has) { drawQR($('qr'), 168); drawQR($('bQR'), 120); } else { $('qr').innerHTML = ''; $('bQR').innerHTML = ''; } }
+  if (u !== lastQR) {
+    lastQR = u;
+    if (has) {
+      drawQR($('qr'), 168);
+      drawQR($('bQR'), 120);
+    } else {
+      $('qr').innerHTML = '';
+      $('bQR').innerHTML = '';
+    }
+  }
+
   $('bCode').textContent = has ? code : '';
   if (has) {
-    $('codeTxt').textContent = code; $('joinUrl').textContent = u;
-    $('cnt').innerHTML = `Jumlah Peserta Terdaftar: <b class="font-display font-extrabold text-3xl align-middle">${P().length}</b>`;
+    $('codeTxt').textContent = code;
+    $('joinUrl').textContent = u;
+    $('cnt').innerHTML = `Peserta Terdaftar: <b class="font-display font-extrabold text-3xl align-middle text-ink">${participants.length}</b> Orang`;
     renderCards();
+    renderQuestions();
   }
-  renderBoard(); renderLog();
+  renderBoard();
+  renderLog();
 }
 
-function renderP() {
-  const me = (S.people || {})[meId];
-  const st = !loaded ? 'pLoad' : !code || !S.meta ? 'pErr' : me ? 'pCard' : 'pReg';
+/* ================= 8. RENDER TAMPILAN PESERTA ================= */
+function switchParticipantTab(tab) {
+  const isScore = (tab === 'score');
+  $('pViewScore').classList.toggle('hidden', !isScore);
+  $('pViewQuiz').classList.toggle('hidden', isScore);
+
+  $('pTabScoreBtn').classList.toggle('bg-white', isScore);
+  $('pTabScoreBtn').classList.toggle('shadow-sm', isScore);
+  $('pTabScoreBtn').classList.toggle('text-ink', isScore);
+  $('pTabScoreBtn').classList.toggle('text-ink/60', !isScore);
+
+  $('pTabQuizBtn').classList.toggle('bg-white', !isScore);
+  $('pTabQuizBtn').classList.toggle('shadow-sm', !isScore);
+  $('pTabQuizBtn').classList.toggle('text-ink', !isScore);
+  $('pTabQuizBtn').classList.toggle('text-ink/60', isScore);
+}
+
+function renderParticipant() {
+  const me = participants.find(x => x.id === meId);
+  const st = !currentSession ? 'pErr' : me ? 'pCard' : 'pReg';
+
   ['pLoad', 'pErr', 'pReg', 'pCard'].forEach(i => $(i).classList.toggle('hidden', i !== st));
-  if (S.meta) $('pCls').textContent = S.meta.cls || 'Pelatihan';
+  if (currentSession) $('pCls').textContent = currentSession.title || 'Pelatihan Kelas';
   if (st !== 'pCard') return;
-  const r = ranked(), x = r.find(p => p.id === meId);
-  $('pName').textContent = x.name; $('pDiv').textContent = x.divisi || '';
-  $('pPts').textContent = x.pts; $('pRank').textContent = `Peringkat ${x.rank} dari ${r.length} peserta`;
-  const rows = r.slice(0, 5); if (!rows.includes(x)) rows.push(x);
-  $('pTop').innerHTML = rows.map(p => `
-    <li class="flex items-center gap-3 py-2.5 ${p.id === meId ? 'bg-sun/30 -mx-2 px-2 rounded-lg' : ''}">
-      <span class="w-7 text-right font-display font-extrabold ${p.rank === 1 ? 'text-[#B8860B]' : 'text-ink/40'}">${p.rank}</span>
-      <span class="flex-1 truncate font-medium">${esc(p.name)}${p.id === meId ? ' (Anda)' : ''}</span>
-      <span class="font-display font-bold tabular-nums">${p.pts}</span>
-    </li>`).join('');
-}
-const render = () => PMODE ? renderP() : renderA();
 
+  const rList = getRankedList();
+  const myData = rList.find(x => x.id === meId) || me;
+
+  $('pName').textContent = myData.name;
+  $('pDiv').textContent = myData.division || '';
+  $('pPts').textContent = myData.total_points || 0;
+  $('pRank').textContent = `Peringkat ${myData.rank || 1} dari ${participants.length} peserta`;
+  $('pQuizCount').textContent = questions.length;
+
+  // 5 Teratas
+  const topRows = rList.slice(0, 5);
+  if (!topRows.find(x => x.id === meId)) topRows.push(myData);
+
+  $('pTop').innerHTML = topRows.map(p => `
+    <li class="flex items-center gap-3 py-2.5 ${p.id === meId ? 'bg-sun/20 -mx-2 px-2 rounded-xl font-bold' : ''}">
+      <span class="w-6 text-right font-display font-bold ${p.rank === 1 ? 'text-sun' : 'text-ink/40'}">${p.rank}</span>
+      <span class="flex-1 truncate text-sm text-ink">${esc(p.name)}${p.id === meId ? ' (Anda)' : ''}</span>
+      <span class="font-display font-extrabold text-sm tabular-nums text-sky">${p.total_points || 0} Pts</span>
+    </li>
+  `).join('');
+
+  // Render Lembar Kuis untuk Peserta
+  renderParticipantQuiz();
+}
+
+function renderParticipantQuiz() {
+  const container = $('pQuizList');
+  if (!container) return;
+
+  if (!questions.length) {
+    container.innerHTML = '<p class="text-center text-ink/60 py-10">Belum ada soal kuis aktif dari instruktur.</p>';
+    return;
+  }
+
+  container.innerHTML = questions.map((q, idx) => {
+    const sub = submissions.find(s => s.question_id === q.id);
+    const answered = !!sub;
+
+    return `
+      <div class="bg-white border border-ink/10 rounded-2xl p-4 shadow-sm space-y-3">
+        <div class="flex items-start justify-between gap-2">
+          <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-sky/10 text-sky">Soal ${idx + 1}</span>
+          <span class="text-xs font-semibold text-ink/60">+${q.points} Poin</span>
+        </div>
+        <p class="font-display font-bold text-base text-ink">${esc(q.question)}</p>
+
+        <div class="space-y-2">
+          ${(q.options || []).map((opt, optIdx) => {
+            let btnStyle = "border-ink/15 hover:border-sky text-ink bg-paper/50";
+            let indicator = "";
+
+            if (answered) {
+              if (optIdx === q.correct_index) {
+                btnStyle = "border-mint bg-mint/10 text-mint font-bold";
+                indicator = " ✓ Benar";
+              } else if (optIdx === sub.selected_index && !sub.is_correct) {
+                btnStyle = "border-coral bg-coral/10 text-coral font-bold";
+                indicator = " ✕ Salah";
+              } else {
+                btnStyle = "border-ink/10 opacity-50 text-ink/60";
+              }
+            }
+
+            return `
+              <button ${answered ? 'disabled' : ''} onclick="submitAnswer('${q.id}', ${optIdx})"
+                class="w-full text-left p-3 rounded-xl border text-sm transition-all flex items-center justify-between ${btnStyle}">
+                <span><b class="mr-1.5">${['A','B','C','D'][optIdx]}.</b> ${esc(opt)}</span>
+                <span class="text-xs font-bold">${indicator}</span>
+              </button>
+            `;
+          }).join('')}
+        </div>
+
+        ${answered && q.explanation ? `
+          <div class="p-3 rounded-xl bg-sky/5 border border-sky/10 text-xs text-ink/80 mt-2">
+            <span class="font-bold text-sky">💡 Pembahasan:</span> ${esc(q.explanation)}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+const render = () => PMODE ? renderParticipant() : renderInstructor();
+
+/* ================= 9. EKSPOR CSV ================= */
 function exportCSV() {
-  const r = ranked(), n = (id, c) => L().filter(l => l.pid === id && l.cat === c).length;
+  const r = getRankedList();
   const cell = v => /[;"\n]/.test(v = String(v)) ? '"' + v.replace(/"/g, '""') + '"' : v;
-  const nm = l => ((S.people || {})[l.pid] || {}).name || l.name;
   const rows = [
-    ['Kelas', (S.meta && S.meta.cls) || '-', 'Kode', code], [],
-    ['Peringkat','Nama','Divisi','Total Poin','Bertanya','Kritis','Menjawab','Dikurangi'],
-    ...r.map(p => [p.rank, p.name, p.divisi || '', p.pts, n(p.id,'ask'), n(p.id,'crit'), n(p.id,'ans'), n(p.id,'minus')]),
-    [], ['Riwayat Aktivitas'], ['Waktu','Nama','Kategori','Poin'],
-    ...L().map(l => [new Date(l.t).toLocaleString('id-ID'), nm(l), CATS[l.cat].l, l.pts])
+    ['Kelas', (currentSession && currentSession.title) || '-', 'Kode', code], [],
+    ['Peringkat','Nama','Divisi','Total Poin'],
+    ...r.map(p => [p.rank, p.name, p.division || '', p.total_points || 0]),
+    [], ['Riwayat Aktivitas & Jawaban Kuis'], ['Waktu','Nama Peserta','Keterangan','Perubahan Poin'],
+    ...pointLogs.map(l => {
+      const p = participants.find(x => x.id === l.participant_id) || {};
+      return [new Date(l.created_at).toLocaleString('id-ID'), p.name || 'Peserta', l.description || l.category, l.points];
+    })
   ];
   const csv = '\uFEFFsep=;\n' + rows.map(x => x.map(cell).join(';')).join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8' }));
-  a.download = `partisipasi-${code || 'kelas'}-${new Date().toISOString().slice(0,10)}.csv`;
-  a.click(); URL.revokeObjectURL(a.href);
-  toast('CSV diunduh. Buka dengan Excel.');
+  a.download = `rekap-kuis-${code || 'kelas'}-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('CSV rekapitulasi berhasil diunduh!');
 }
 
-/* ===================== 7. EVENT & START ===================== */
+/* ================= 10. EVENT LISTENERS ================= */
 document.addEventListener('click', e => {
-  const b = e.target.closest('[data-a],[data-undo],[data-del],[data-edit],[data-go]'); if (!b) return;
-  const d = b.dataset;
-  if (d.a) award(d.id, d.a); else if (d.undo) undo(d.undo); else if (d.del) delP(d.del); else if (d.edit) editP(d.edit); else if (d.go) setTab(d.go);
+  const b = e.target.closest('[data-go]');
+  if (b) setTab(b.dataset.go);
 });
-$('q').addEventListener('input', e => { q = e.target.value; renderCards(); });
-$('cls').addEventListener('input', e => { clearTimeout(ct); ct = setTimeout(() => { if (code && S.meta) put('meta/cls', e.target.value.trim()); }, 400); });
-$('baseUrl').value = ls.get('gcpt.base') || '';
-$('baseUrl').addEventListener('input', e => { ls.set('gcpt.base', e.target.value.trim()); lastQR = ''; renderA(); });
 
-watch();
+$('q').addEventListener('input', () => renderCards());
+
+$('cls').addEventListener('input', e => {
+  clearTimeout(ct);
+  ct = setTimeout(async () => {
+    if (code && currentSession) {
+      await db.from('quiz_sessions').update({ title: e.target.value.trim() }).eq('code', code);
+    }
+  }, 500);
+});
+
+$('baseUrl').value = ls.get('quiz.base') || '';
+$('baseUrl').addEventListener('input', e => {
+  ls.set('quiz.base', e.target.value.trim());
+  lastQR = '';
+  renderInstructor();
+});
+
+// Start App
+setupRealtime();
+loadAllData();
 setTab(location.hash === '#papan' ? 'papan' : 'peserta');
 </script>
 </body>
