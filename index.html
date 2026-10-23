@@ -6,6 +6,7 @@
 <title>Papan Partisipasi & Quiz Learning</title>
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>window.QRCode || document.write('<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script>')</script>
 <!-- Supabase JS Client -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -416,15 +417,12 @@ const joinUrl = (c = code) => base() + '?kelas=' + c;
 function renderQR(containerId, targetUrl, size = 150) {
   const el = $(containerId);
   if (!el) return;
-  // Langsung inject image QR yang 100% stabil
-  const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=2&data=${encodeURIComponent(targetUrl)}`;
-  el.innerHTML = `<img src="${qrImgUrl}" alt="QR Barcode" width="${size}" height="${size}" class="rounded-xl block mx-auto shadow-sm select-none" loading="eager" />`;
+  el.innerHTML = '';
 
-  // Fallback lokal QRCode canvas jika script tersedia
+  let success = false;
   if (typeof QRCode !== 'undefined') {
     try {
-      const tempDiv = document.createElement('div');
-      new QRCode(tempDiv, {
+      new QRCode(el, {
         text: targetUrl,
         width: size,
         height: size,
@@ -432,12 +430,32 @@ function renderQR(containerId, targetUrl, size = 150) {
         colorLight: '#ffffff',
         correctLevel: QRCode.CorrectLevel.M
       });
-      const canvas = tempDiv.querySelector('canvas');
-      if (canvas) {
-        el.innerHTML = '';
-        el.appendChild(canvas);
+      const img = el.querySelector('img');
+      const canvas = el.querySelector('canvas');
+      if (img) {
+        img.style.display = 'block';
+        img.style.margin = 'auto';
+        img.style.borderRadius = '0.75rem';
+        success = true;
       }
-    } catch(e) {}
+      if (canvas) {
+        canvas.style.borderRadius = '0.75rem';
+        if (!img) {
+          canvas.style.display = 'block';
+          canvas.style.margin = 'auto';
+        }
+        success = true;
+      }
+    } catch(e) {
+      console.warn('QRCode JS error:', e);
+      success = false;
+    }
+  }
+
+  // Jika QRCode library gagal atau tidak ada, pakai Image API
+  if (!success || !el.children.length) {
+    const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=2&data=${encodeURIComponent(targetUrl)}`;
+    el.innerHTML = `<img src="${qrImgUrl}" alt="QR Barcode" width="${size}" height="${size}" class="rounded-xl block mx-auto shadow-sm select-none" />`;
   }
 }
 
