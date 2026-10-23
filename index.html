@@ -3,10 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Papan Partisipasi & Moderasi Tanya-Jawab</title>
+<title>Papan Partisipasi & Antrean Bertanya</title>
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script>window.QRCode || document.write('<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script>')</script>
+<!-- Engine Barcode QR SVG (Local + CDN fallback) -->
+<script src="qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <!-- Supabase JS Client -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -42,7 +44,7 @@ tailwind.config = { theme: { extend: {
       <div class="w-10 h-10 rounded-2xl bg-sun/40 text-ink flex items-center justify-center font-bold text-xl shadow-sm">🎓</div>
       <div>
         <h1 class="font-display font-extrabold text-xl md:text-2xl text-ink tracking-tight">Papan Partisipasi</h1>
-        <p class="text-xs text-ink/50 hidden sm:block">Live Q&A & Moderasi Partisipasi Kelas</p>
+        <p class="text-xs text-ink/50 hidden sm:block">Live Hand-Raise & Antrean Tanya Jawab</p>
       </div>
     </div>
     
@@ -92,15 +94,15 @@ tailwind.config = { theme: { extend: {
   <div id="noSes" class="hidden text-center text-ink/60 py-16 bg-white border border-ink/10 rounded-3xl p-8 shadow-sm">
     <div class="w-16 h-16 rounded-3xl bg-sun/30 flex items-center justify-center text-3xl mx-auto mb-3">🎓</div>
     <h3 class="font-display font-bold text-xl text-ink">Belum Ada Sesi Pelatihan</h3>
-    <p class="text-sm text-ink/60 mt-1 max-w-md mx-auto">Klik tombol "Buat Sesi Baru" di atas untuk membuat barcode kelas dan mulai menerima pertanyaan dari peserta.</p>
+    <p class="text-sm text-ink/60 mt-1 max-w-md mx-auto">Klik tombol "Buat Sesi Baru" di atas untuk membuat barcode kelas dan mulai menerima peserta.</p>
   </div>
 
   <!-- KARTU SESI AKTIF DENGAN BARCODE & KONTROL (TAMPIL DI PALING ATAS) -->
   <div id="activeSessionCard" class="hidden bg-white border-2 border-sky rounded-3xl p-5 md:p-7 shadow-md space-y-5">
     <div class="flex flex-wrap md:flex-nowrap gap-6 items-center">
-      <!-- Container Barcode QR -->
-      <div id="activeQRContainer" class="bg-white p-2.5 border border-ink/10 rounded-2xl shadow-inner shrink-0 w-[150px] h-[150px] flex items-center justify-center">
-        <!-- Image QR Code diisi oleh JS -->
+      <!-- Container Barcode QR (SVG Vector Murni - 100% Tajam & Muncul) -->
+      <div id="activeQRContainer" class="bg-white p-3 border border-ink/10 rounded-2xl shadow-inner shrink-0 w-[160px] h-[160px] flex items-center justify-center overflow-hidden">
+        <!-- SVG QR Code diisi oleh JS -->
       </div>
 
       <!-- Info Sesi Aktif -->
@@ -130,8 +132,8 @@ tailwind.config = { theme: { extend: {
 
         <!-- Tombol Aksi Langsung di Kelas Ini -->
         <div class="flex flex-wrap items-center gap-2 mt-4 pt-2 border-t border-ink/5">
-          <button id="tabBtn_approval" onclick="switchClassTab('approval')" class="px-4 py-2 rounded-xl text-xs md:text-sm font-bold bg-sky text-white shadow-sm transition-all flex items-center gap-1.5">
-            <span>🔔</span> Antrean Pertanyaan <span id="pendingBadgeCount" class="ml-1 px-2 py-0.5 rounded-full bg-white text-sky text-xs font-extrabold">0</span>
+          <button id="tabBtn_handraise" onclick="switchClassTab('handraise')" class="px-4 py-2 rounded-xl text-xs md:text-sm font-bold bg-sky text-white shadow-sm transition-all flex items-center gap-1.5">
+            <span>✋</span> Antrean Angkat Tangan <span id="handRaiseBadgeCount" class="ml-1 px-2 py-0.5 rounded-full bg-white text-sky text-xs font-extrabold">0</span>
           </button>
           <button id="tabBtn_peserta" onclick="switchClassTab('peserta')" class="px-4 py-2 rounded-xl text-xs md:text-sm font-medium bg-ink/5 text-ink hover:bg-ink/10 transition-all flex items-center gap-1.5">
             <span>👥</span> Peserta
@@ -152,16 +154,16 @@ tailwind.config = { theme: { extend: {
     <!-- WORKSPACE SUB-PANEL KELAS AKTIF -->
     <div id="classWorkspacePanel" class="pt-4 border-t border-ink/10">
       
-      <!-- Panel 1: Antrean Pertanyaan Masuk (Persetujuan Panitia) -->
-      <div id="panel_approval" class="space-y-4">
+      <!-- Panel 1: Antrean Angkat Tangan (Live Hand Raise Queue) -->
+      <div id="panel_handraise" class="space-y-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 class="font-display font-bold text-lg text-ink">Moderasi Pengajuan Peserta (Live Approval)</h3>
-            <p class="text-xs text-ink/60">Pertanyaan atau tanggapan yang diajukan peserta dari HP akan muncul di sini. Setujui untuk memberi poin otomatis.</p>
+            <h3 class="font-display font-bold text-lg text-ink">Antrean Peserta yang Mengangkat Tangan (Live)</h3>
+            <p class="text-xs text-ink/60">Peserta yang menekan tombol lambaikan tangan di HP akan otomatis berurutan di sini. Panitia dapat melihat siapa yang duluan.</p>
           </div>
         </div>
 
-        <div id="approvalList" class="space-y-3"></div>
+        <div id="handRaiseQueueList" class="space-y-3"></div>
       </div>
 
       <!-- Panel 2: Peserta & Nilai Manual -->
@@ -169,7 +171,7 @@ tailwind.config = { theme: { extend: {
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 class="font-display font-bold text-lg text-ink">Daftar Peserta & Nilai Partisipasi</h3>
-            <p class="text-xs text-ink/60">Beri poin partisipasi manual (+5, +10, -2) secara langsung.</p>
+            <p class="text-xs text-ink/60">Beri poin partisipasi manual (+5, +10, -2) secara langsung ke peserta.</p>
           </div>
           <button onclick="$('qa').classList.toggle('hidden');$('qaText').focus()" class="px-4 py-2 rounded-xl bg-ink/5 text-sm font-medium hover:bg-ink/10 transition-colors">+ Tambah Peserta Manual</button>
         </div>
@@ -252,7 +254,7 @@ tailwind.config = { theme: { extend: {
     <div class="text-center pb-2">
       <div class="w-12 h-12 rounded-2xl bg-sun/40 text-ink flex items-center justify-center mx-auto mb-3 font-display font-extrabold text-2xl">🎓</div>
       <h2 class="font-display font-extrabold text-2xl">Masuk Sesi Kelas</h2>
-      <p class="text-sm text-ink/60 mt-1">Masukkan nama & divisi Anda untuk mulai mengajukan pertanyaan dan mengumpulkan poin partisipasi.</p>
+      <p class="text-sm text-ink/60 mt-1">Masukkan nama & divisi Anda untuk mulai ikut berpartisipasi dan mengumpulkan poin kelas.</p>
     </div>
     <div>
       <label for="rName" class="block font-medium mb-1 text-sm">Nama Lengkap</label>
@@ -265,16 +267,16 @@ tailwind.config = { theme: { extend: {
     <button class="w-full py-4 rounded-xl bg-sun font-bold text-lg hover:brightness-95 transition-all shadow text-ink">Masuk Kelas</button>
   </form>
 
-  <!-- Dashboard Peserta & Form Tanya Jawab -->
+  <!-- Dashboard Peserta & Tombol Lambaikan Tangan -->
   <div id="pCard" class="hidden space-y-4">
     <!-- Tab Navigasi Peserta -->
     <div class="flex bg-ink/5 p-1 rounded-2xl">
-      <button id="pTabAskBtn" onclick="switchParticipantTab('ask')" class="flex-1 py-2.5 rounded-xl font-bold text-sm bg-white shadow-sm text-ink transition-all">💬 Ajukan Pertanyaan</button>
+      <button id="pTabHandBtn" onclick="switchParticipantTab('hand')" class="flex-1 py-2.5 rounded-xl font-bold text-sm bg-white shadow-sm text-ink transition-all">✋ Angkat Tangan</button>
       <button id="pTabScoreBtn" onclick="switchParticipantTab('score')" class="flex-1 py-2.5 rounded-xl font-medium text-sm text-ink/60 hover:text-ink transition-all">🏆 Papan Skor</button>
     </div>
 
-    <!-- View 1: Form Pengajuan Pertanyaan & Status Pengajuan Saya -->
-    <div id="pViewAsk" class="space-y-4">
+    <!-- View 1: Tombol Angkat Tangan Interaktif -->
+    <div id="pViewHand" class="space-y-4">
       <!-- Kartu Skor Ringkas Peserta -->
       <section class="bg-ink text-white rounded-3xl p-5 shadow-md flex items-center justify-between">
         <div>
@@ -288,39 +290,43 @@ tailwind.config = { theme: { extend: {
         </div>
       </section>
 
-      <!-- Form Pengajuan Pertanyaan -->
-      <section class="bg-white border border-ink/10 rounded-3xl p-5 shadow-sm space-y-3">
-        <h3 class="font-display font-bold text-lg text-ink">Ajukan ke Instruktur / Panitia</h3>
+      <!-- TOMBOL UTAMA ANGKAT TANGAN -->
+      <section class="bg-white border border-ink/10 rounded-3xl p-6 shadow-sm text-center space-y-4">
         
-        <div>
-          <label class="block text-xs font-semibold text-ink/70 mb-1.5">Pilih Kategori Partisipasi:</label>
-          <div class="grid grid-cols-3 gap-1.5">
-            <button type="button" onclick="selectQuestionCategory('ask')" id="catBtn_ask" class="py-2 px-1 text-center rounded-xl text-xs font-bold border border-sky bg-sky/10 text-sky transition-all">
-              🙋 Bertanya (+5)
-            </button>
-            <button type="button" onclick="selectQuestionCategory('crit')" id="catBtn_crit" class="py-2 px-1 text-center rounded-xl text-xs font-medium border border-ink/10 bg-paper text-ink/70 hover:bg-paper/80 transition-all">
-              💡 Kritis (+10)
-            </button>
-            <button type="button" onclick="selectQuestionCategory('ans')" id="catBtn_ans" class="py-2 px-1 text-center rounded-xl text-xs font-medium border border-ink/10 bg-paper text-ink/70 hover:bg-paper/80 transition-all">
-              🎤 Menjawab (+5)
-            </button>
+        <!-- Kondisi 1: Tangan Belum Diangkat -->
+        <div id="handIdleState" class="space-y-3">
+          <button onclick="triggerHandRaise()" class="w-full py-8 px-4 rounded-3xl bg-sun text-ink font-display font-extrabold text-2xl md:text-3xl shadow-lg hover:brightness-95 active:scale-95 transition-all flex flex-col items-center justify-center gap-2 border-2 border-sun/60">
+            <span class="text-6xl animate-bounce">✋</span>
+            <span>Angkat Tangan</span>
+            <span class="text-xs font-sans font-medium text-ink/70 bg-white/40 px-3 py-1 rounded-full">Ketuk untuk masuk antrean bertanya</span>
+          </button>
+          <p class="text-xs text-ink/50">Instruktur & panitia akan melihat nama Anda di antrean terdepan.</p>
+        </div>
+
+        <!-- Kondisi 2: Tangan Sedang Terangkat (Menunggu Panggilan) -->
+        <div id="handRaisedState" class="hidden space-y-4 py-2">
+          <div class="w-24 h-24 rounded-full bg-amber-100 border-4 border-sun flex items-center justify-center mx-auto text-5xl animate-pulse">
+            ✋
           </div>
+          <div>
+            <span id="queuePositionBadge" class="inline-block px-3 py-1 rounded-full text-xs font-extrabold bg-amber-500 text-white mb-1 shadow-xs">
+              Antrean ke-1 di Kelas
+            </span>
+            <h3 class="font-display font-extrabold text-2xl text-ink">Tangan Anda Terangkat!</h3>
+            <p class="text-xs text-ink/60 mt-1 max-w-xs mx-auto">Nama Anda sudah masuk ke layar panitia. Silakan bersiap untuk berbicara saat instruktur memanggil nama Anda.</p>
+          </div>
+
+          <button onclick="cancelHandRaise()" class="py-2.5 px-5 rounded-xl border border-coral/30 text-coral text-xs font-semibold hover:bg-coral/5 transition-colors">
+            ✕ Batalkan Angkat Tangan
+          </button>
         </div>
 
-        <div>
-          <label for="pQuestionText" class="block text-xs font-semibold text-ink/70 mb-1">Isi Pertanyaan / Tanggapan Anda:</label>
-          <textarea id="pQuestionText" rows="3" placeholder="Tuliskan pertanyaan, ide, atau jawaban Anda di sini..." class="w-full bg-paper border border-ink/15 rounded-xl p-3 text-sm focus:border-sky focus:bg-white focus:outline-none transition-all"></textarea>
-        </div>
-
-        <button onclick="submitQuestionFromParticipant()" class="w-full py-3 rounded-xl bg-sky text-white font-bold text-sm shadow hover:brightness-95 transition-all flex items-center justify-center gap-1.5">
-          <span>🚀</span> Kirim ke Panitia
-        </button>
       </section>
 
-      <!-- Riwayat Pengajuan Saya -->
-      <section class="space-y-3">
-        <h4 class="font-display font-bold text-base text-ink">Riwayat Pengajuan Saya</h4>
-        <div id="mySubmissionsList" class="space-y-2.5"></div>
+      <!-- Riwayat Poin Saya -->
+      <section class="bg-white border border-ink/10 rounded-2xl p-4 shadow-sm">
+        <h4 class="font-display font-bold text-sm text-ink mb-2">Riwayat Poin yang Diperoleh</h4>
+        <div id="myPointHistoryList" class="space-y-2"></div>
       </section>
     </div>
 
@@ -367,11 +373,9 @@ let allSessions = [];
 let currentSession = null;
 let participants = [];
 let pointLogs = [];
-let pendingQuestions = [];
-let myQuestions = [];
+let handRaiseQueue = [];
 let sessionParticipantCounts = {};
-let currentClassTab = 'approval';
-let selectedCategory = 'ask';
+let currentClassTab = 'handraise';
 let meId = PMODE ? ls.get('quiz.me.' + code) : null;
 let tt;
 
@@ -386,7 +390,7 @@ function toast(msg) {
   tt = setTimeout(() => t.style.opacity = 0, 2200);
 }
 
-/* ================= 4. QR CODE ENGINE (100% RELIABLE) ================= */
+/* ================= 4. QR CODE ENGINE (MURNI INLINE SVG - 100% RELIABLE) ================= */
 const base = () => location.href.split(/[?#]/)[0];
 const joinUrl = (c = code) => base() + '?kelas=' + c;
 
@@ -395,40 +399,34 @@ function renderQR(containerId, targetUrl, size = 150) {
   if (!el) return;
   el.innerHTML = '';
 
-  let success = false;
-  if (typeof QRCode !== 'undefined') {
+  let generatedSvg = false;
+  // Gunakan generator SVG offline murni
+  if (typeof qrcode !== 'undefined') {
     try {
-      new QRCode(el, {
-        text: targetUrl,
-        width: size,
-        height: size,
-        colorDark: '#16213E',
-        colorLight: '#ffffff',
-        correctLevel: QRCode.CorrectLevel.M
-      });
-      const img = el.querySelector('img');
-      const canvas = el.querySelector('canvas');
-      if (img) {
-        img.style.display = 'block';
-        img.style.margin = 'auto';
-        img.style.borderRadius = '0.75rem';
-        success = true;
-      }
-      if (canvas) {
-        canvas.style.borderRadius = '0.75rem';
-        if (!img) {
-          canvas.style.display = 'block';
-          canvas.style.margin = 'auto';
-        }
-        success = true;
+      const qr = qrcode(0, 'M');
+      qr.addData(targetUrl);
+      qr.make();
+      const svgTag = qr.createSvgTag({ scalable: true });
+      el.innerHTML = svgTag;
+      const svgEl = el.querySelector('svg');
+      if (svgEl) {
+        svgEl.setAttribute('width', size);
+        svgEl.setAttribute('height', size);
+        svgEl.style.width = size + 'px';
+        svgEl.style.height = size + 'px';
+        svgEl.style.display = 'block';
+        svgEl.style.margin = 'auto';
+        svgEl.classList.add('rounded-lg');
+        generatedSvg = true;
       }
     } catch(e) {
-      success = false;
+      console.warn('SVG QR generator error:', e);
+      generatedSvg = false;
     }
   }
 
-  // Jika QRCode library gagal, pakai Image API fallback
-  if (!success || !el.children.length) {
+  // Fallback cadangan jika engine SVG tidak tersedia
+  if (!generatedSvg || !el.children.length) {
     const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=2&data=${encodeURIComponent(targetUrl)}`;
     el.innerHTML = `<img src="${qrImgUrl}" alt="QR Barcode" width="${size}" height="${size}" class="rounded-xl block mx-auto shadow-sm select-none" />`;
   }
@@ -457,7 +455,7 @@ async function loadAllData() {
     }
   }
 
-  // 3. Ambil data peserta & pertanyaan untuk sesi aktif
+  // 3. Ambil data peserta & log poin untuk sesi aktif
   if (code) {
     const { data: pData } = await db.from('quiz_participants').select('*').eq('session_code', code).order('total_points', { ascending: false });
     participants = pData || [];
@@ -465,22 +463,14 @@ async function loadAllData() {
     const { data: lData } = await db.from('quiz_point_logs').select('*').eq('session_code', code).order('created_at', { ascending: false });
     pointLogs = lData || [];
 
-    // Ambil antrean pengajuan pertanyaan (dengan graceful fallback jika tabel baru)
-    try {
-      const { data: qData } = await db.from('class_questions').select('*').eq('session_code', code).order('created_at', { ascending: false });
-      pendingQuestions = qData || [];
-    } catch(e) {
-      pendingQuestions = [];
-    }
-
-    if (meId) {
-      myQuestions = pendingQuestions.filter(q => q.participant_id === meId);
-    }
+    // Filter antrean angkat tangan (category === 'hand_raise'), urutkan First-In First-Out (paling awal angkat tangan = #1)
+    handRaiseQueue = pointLogs
+      .filter(l => l.category === 'hand_raise')
+      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
   } else {
     participants = [];
     pointLogs = [];
-    pendingQuestions = [];
-    myQuestions = [];
+    handRaiseQueue = [];
   }
 
   // 4. Hitung jumlah peserta tiap sesi
@@ -499,11 +489,10 @@ function setupRealtime() {
   if (realtimeChannel) {
     db.removeChannel(realtimeChannel);
   }
-  realtimeChannel = db.channel('class-qa-sync')
+  realtimeChannel = db.channel('class-handraise-sync')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'quiz_sessions' }, () => loadAllData())
     .on('postgres_changes', { event: '*', schema: 'public', table: 'quiz_participants' }, () => loadAllData())
     .on('postgres_changes', { event: '*', schema: 'public', table: 'quiz_point_logs' }, () => loadAllData())
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'class_questions' }, () => loadAllData())
     .subscribe();
 }
 
@@ -546,7 +535,7 @@ async function submitNewSession() {
   // Set sesi baru sebagai sesi aktif di paling atas
   code = c;
   ls.set('quiz.code', c);
-  currentClassTab = 'approval';
+  currentClassTab = 'handraise';
   toast(`Sesi "${title}" berhasil dibuat!`);
   await loadAllData();
 }
@@ -558,7 +547,7 @@ function selectSession(sessionCode) {
 }
 
 async function deleteSession(sessionCode, sessionTitle) {
-  if (!confirm(`Hapus sesi "${sessionTitle}" (${sessionCode}) beserta seluruh data peserta dan riwayat pertanyaannya?`)) return;
+  if (!confirm(`Hapus sesi "${sessionTitle}" (${sessionCode}) beserta seluruh data peserta dan riwayatnya?`)) return;
   const { error } = await db.from('quiz_sessions').delete().eq('code', sessionCode);
   if (error) {
     toast('Gagal menghapus sesi: ' + error.message);
@@ -590,7 +579,7 @@ function backToTopSession() {
 
 function switchClassTab(tab) {
   currentClassTab = tab;
-  ['approval', 'peserta', 'papan'].forEach(t => {
+  ['handraise', 'peserta', 'papan'].forEach(t => {
     const p = $('panel_' + t);
     const b = $('tabBtn_' + t);
     const on = (t === tab);
@@ -612,49 +601,72 @@ function switchClassTab(tab) {
   }
 }
 
-/* ================= 7. AKSI LIVE APPROVAL & POIN ================= */
-async function approveQuestion(qId, customPoints = null) {
-  const q = pendingQuestions.find(x => x.id === qId);
-  if (!q) return;
+/* ================= 7. AKSI ANGKAT TANGAN & POIN ================= */
+// Peserta menekan tombol Lambaikan Tangan di HP
+async function triggerHandRaise() {
+  if (!meId) return toast('Silakan daftar terlebih dahulu');
 
-  const pts = customPoints !== null ? customPoints : (CATS[q.category]?.p || 5);
+  // Cek apakah tangan sudah terangkat
+  const alreadyRaised = pointLogs.some(l => l.participant_id === meId && l.category === 'hand_raise');
+  if (alreadyRaised) return toast('Tangan Anda sudah terangkat!');
 
-  // 1. Update status pertanyaan menjadi approved
-  await db.from('class_questions').update({
-    status: 'approved',
-    points_awarded: pts
-  }).eq('id', qId);
+  const me = participants.find(x => x.id === meId);
+  const myName = me ? me.name : 'Peserta';
 
-  // 2. Tambah poin ke peserta
-  const p = participants.find(x => x.id === q.participant_id);
-  if (p) {
-    const newTotal = (p.total_points || 0) + pts;
-    await db.from('quiz_participants').update({ total_points: newTotal }).eq('id', p.id);
-  }
-
-  // 3. Catat di log poin
-  await db.from('quiz_point_logs').insert([{
+  const { error } = await db.from('quiz_point_logs').insert([{
     session_code: code,
-    participant_id: q.participant_id,
-    category: q.category,
-    points: pts,
-    description: `${CATS[q.category]?.l}: "${q.question_text.slice(0, 50)}"`
+    participant_id: meId,
+    category: 'hand_raise',
+    points: 0,
+    description: `Angkat Tangan: ${myName}`
   }]);
 
-  toast(`✅ Disetujui! ${q.participant_name} +${pts} Poin`);
+  if (error) {
+    toast('Gagal mengangkat tangan: ' + error.message);
+    return;
+  }
+
+  toast('✋ Tangan Anda terangkat! Masuk antrean panitia.');
   loadAllData();
 }
 
-async function rejectQuestion(qId) {
-  const q = pendingQuestions.find(x => x.id === qId);
-  if (!q) return;
+// Peserta membatalkan angkat tangan
+async function cancelHandRaise() {
+  if (!meId) return;
+  await db.from('quiz_point_logs')
+    .delete()
+    .eq('session_code', code)
+    .eq('participant_id', meId)
+    .eq('category', 'hand_raise');
 
-  await db.from('class_questions').update({
-    status: 'rejected',
-    points_awarded: 0
-  }).eq('id', qId);
+  toast('Angkat tangan dibatalkan');
+  loadAllData();
+}
 
-  toast(`Pengajuan ditolak`);
+// Panitia menyetujui dan memberi poin pada peserta yang angkat tangan
+async function approveHandRaise(logId, participantId, category, pointsAwarded) {
+  const p = participants.find(x => x.id === participantId);
+  if (!p) return;
+
+  // 1. Update log menjadi poin resmi (misal: 'ask' +5 pts)
+  await db.from('quiz_point_logs').update({
+    category: category,
+    points: pointsAwarded,
+    description: `${CATS[category]?.l || 'Partisipasi'} (${p.name})`
+  }).eq('id', logId);
+
+  // 2. Tambah total poin peserta
+  const newTotal = (p.total_points || 0) + pointsAwarded;
+  await db.from('quiz_participants').update({ total_points: newTotal }).eq('id', participantId);
+
+  toast(`✅ ${p.name} diberi giliran! +${pointsAwarded} Poin`);
+  loadAllData();
+}
+
+// Panitia menurunkan tangan tanpa poin (selesai/batal)
+async function dismissHandRaise(logId) {
+  await db.from('quiz_point_logs').delete().eq('id', logId);
+  toast('Tangan diturunkan');
   loadAllData();
 }
 
@@ -683,13 +695,13 @@ async function undo(logId) {
   if (!l) return;
 
   const p = participants.find(x => x.id === l.participant_id);
-  if (p) {
+  if (p && l.points !== 0) {
     const reverted = (p.total_points || 0) - l.points;
     await db.from('quiz_participants').update({ total_points: reverted }).eq('id', p.id);
   }
 
   await db.from('quiz_point_logs').delete().eq('id', logId);
-  toast(`Dibatalkan: ${l.description} (${sg(l.points)})`);
+  toast(`Dibatalkan: ${l.description}`);
   loadAllData();
 }
 
@@ -758,55 +770,6 @@ async function daftar(e) {
   meId = data.id;
   ls.set('quiz.me.' + code, meId);
   toast('Berhasil bergabung!');
-  loadAllData();
-}
-
-function selectQuestionCategory(cat) {
-  selectedCategory = cat;
-  ['ask', 'crit', 'ans'].forEach(c => {
-    const btn = $('catBtn_' + c);
-    const on = (c === cat);
-    if (btn) {
-      btn.classList.toggle('bg-sky/10', on);
-      btn.classList.toggle('text-sky', on);
-      btn.classList.toggle('border-sky', on);
-      btn.classList.toggle('font-bold', on);
-      btn.classList.toggle('bg-paper', !on);
-      btn.classList.toggle('text-ink/70', !on);
-      btn.classList.toggle('border-ink/10', !on);
-      btn.classList.toggle('font-medium', !on);
-    }
-  });
-}
-
-async function submitQuestionFromParticipant() {
-  const text = $('pQuestionText').value.trim();
-  if (!text) return toast('Tuliskan pertanyaan / tanggapan Anda terlebih dahulu');
-  if (!meId) return toast('Silakan daftar terlebih dahulu');
-
-  const me = participants.find(x => x.id === meId);
-  const myName = me ? me.name : 'Peserta';
-  const myDiv = me ? me.division : '';
-
-  const { error } = await db.from('class_questions').insert([{
-    session_code: code,
-    participant_id: meId,
-    participant_name: myName,
-    participant_division: myDiv,
-    category: selectedCategory,
-    question_text: text,
-    status: 'pending',
-    points_awarded: 0
-  }]);
-
-  if (error) {
-    // Graceful fallback jika tabel belum ada di Supabase
-    toast('Gagal mengajukan: ' + error.message);
-    return;
-  }
-
-  $('pQuestionText').value = '';
-  toast('Pertanyaan berhasil dikirim ke panitia! ⏳');
   loadAllData();
 }
 
@@ -905,51 +868,57 @@ function renderBoard() {
   ` : '');
 }
 
-function renderApprovalList() {
-  const container = $('approvalList');
+function renderHandRaiseQueue() {
+  const container = $('handRaiseQueueList');
   if (!container) return;
 
-  const pending = pendingQuestions.filter(q => q.status === 'pending');
-  $('pendingBadgeCount').textContent = pending.length;
+  $('handRaiseBadgeCount').textContent = handRaiseQueue.length;
 
-  if (!pendingQuestions.length) {
-    container.innerHTML = '<p class="text-center text-ink/60 py-10 bg-white border border-ink/10 rounded-2xl">Belum ada pertanyaan yang diajukan oleh peserta.</p>';
+  if (!handRaiseQueue.length) {
+    container.innerHTML = `
+      <div class="text-center py-12 bg-paper/60 border border-ink/5 rounded-3xl p-6">
+        <span class="text-4xl block mb-2 opacity-40">✋</span>
+        <p class="text-ink/60 font-medium">Belum ada peserta yang mengangkat tangan.</p>
+        <p class="text-xs text-ink/40 mt-1">Saat peserta menekan tombol angkat tangan di HP, antrean urutannya langsung tampil di sini.</p>
+      </div>
+    `;
     return;
   }
 
-  container.innerHTML = pendingQuestions.map(q => {
-    const isPending = (q.status === 'pending');
-    const isApproved = (q.status === 'approved');
-    const catInfo = CATS[q.category] || CATS.ask;
+  container.innerHTML = handRaiseQueue.map((log, index) => {
+    const p = participants.find(x => x.id === log.participant_id) || { name: 'Peserta', division: '' };
+    const queueNum = index + 1;
+    const isFirst = (index === 0);
 
     return `
-      <div class="bg-white border ${isPending ? 'border-sun ring-1 ring-sun/30' : 'border-ink/10 opacity-75'} rounded-2xl p-4 md:p-5 shadow-xs space-y-3">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <div class="flex items-center gap-2">
-            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold ${catInfo.badge}">${catInfo.l} (+${catInfo.p} Pts)</span>
-            <span class="font-display font-bold text-base text-ink">${esc(q.participant_name)}</span>
-            <span class="text-xs text-ink/50">• ${esc(q.participant_division || 'Tanpa Divisi')}</span>
+      <div class="bg-white border ${isFirst ? 'border-amber-400 ring-2 ring-amber-300/40 bg-amber-50/20' : 'border-ink/10'} rounded-2xl p-4 md:p-5 shadow-xs flex flex-wrap items-center justify-between gap-4 transition-all">
+        <div class="flex items-center gap-3.5 min-w-0">
+          <div class="w-12 h-12 rounded-2xl ${isFirst ? 'bg-amber-400 text-ink animate-bounce' : 'bg-ink/5 text-ink/70'} flex items-center justify-center font-display font-extrabold text-xl shrink-0 shadow-xs">
+            #${queueNum}
           </div>
-          <div class="flex items-center gap-2">
-            <time class="text-xs text-ink/40">${fmt(q.created_at)}</time>
-            ${isPending ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sun/40 text-ink animate-pulse">Menunggu Persetujuan</span>' : ''}
-            ${isApproved ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-mint/10 text-mint">✓ Disetujui (+${q.points_awarded} Pts)</span>` : ''}
-            ${q.status === 'rejected' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-coral/10 text-coral">✕ Ditolak</span>' : ''}
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="font-display font-extrabold text-xl text-ink truncate">${esc(p.name)}</span>
+              ${isFirst ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white uppercase tracking-wider">Antrean Pertama</span>' : ''}
+            </div>
+            <p class="text-xs text-ink/60 mt-0.5">
+              ${esc(p.division || 'Tanpa Divisi')} • Diangkat pukul: <b class="text-ink/80">${fmt(log.created_at)}</b>
+            </p>
           </div>
         </div>
 
-        <p class="text-sm md:text-base text-ink/90 bg-paper p-3 rounded-xl border border-ink/5">${esc(q.question_text)}</p>
-
-        ${isPending ? `
-          <div class="flex flex-wrap items-center gap-2 pt-1">
-            <button onclick="approveQuestion('${q.id}', ${catInfo.p})" class="px-4 py-2 rounded-xl bg-mint text-white font-bold text-xs md:text-sm hover:brightness-95 shadow-sm transition-all flex items-center gap-1">
-              <span>✅</span> Setujui (+${catInfo.p} Poin)
-            </button>
-            <button onclick="rejectQuestion('${q.id}')" class="px-3.5 py-2 rounded-xl text-coral hover:bg-coral/10 font-semibold text-xs md:text-sm transition-colors">
-              ✕ Tolak
-            </button>
-          </div>
-        ` : ''}
+        <!-- Tombol Panitia untuk Memberikan Kesempatan & Poin -->
+        <div class="flex flex-wrap items-center gap-2 shrink-0 ml-auto">
+          <button onclick="approveHandRaise('${log.id}', '${p.id}', 'ask', 5)" class="px-4 py-2.5 rounded-xl bg-sky text-white font-bold text-xs md:text-sm hover:brightness-95 shadow-sm transition-all flex items-center gap-1.5">
+            <span>🙋</span> Bertanya (+5)
+          </button>
+          <button onclick="approveHandRaise('${log.id}', '${p.id}', 'crit', 10)" class="px-4 py-2.5 rounded-xl bg-mint text-white font-bold text-xs md:text-sm hover:brightness-95 shadow-sm transition-all flex items-center gap-1.5">
+            <span>💡</span> Kritis (+10)
+          </button>
+          <button onclick="dismissHandRaise('${log.id}')" class="px-3 py-2.5 rounded-xl border border-coral/30 text-coral hover:bg-coral/5 text-xs font-semibold transition-colors">
+            ✕ Turunkan
+          </button>
+        </div>
       </div>
     `;
   }).join('');
@@ -973,19 +942,20 @@ function renderInstructor() {
 
     const pCount = sessionParticipantCounts[currentSession.code] || 0;
     $('activeParticipantCount').innerHTML = `Peserta Terdaftar: <b class="font-display font-bold text-lg text-ink">${pCount}</b> Orang`;
+    $('tabBtn_peserta').innerHTML = `<span>👥</span> Peserta (${pCount})`;
 
     const aUrl = joinUrl(currentSession.code);
     $('activeJoinUrlText').textContent = aUrl;
 
-    // Render Barcode QR Sesi Aktif
-    renderQR('activeQRContainer', aUrl, 150);
+    // Render Barcode QR Sesi Aktif (Murni SVG)
+    renderQR('activeQRContainer', aUrl, 140);
 
     // Pasang tombol Hapus Sesi Aktif
     $('btnDeleteActive').onclick = () => deleteSession(currentSession.code, title);
 
     // Render panel aktif
     switchClassTab(currentClassTab);
-    renderApprovalList();
+    renderHandRaiseQueue();
     renderCards();
   }
 
@@ -1004,7 +974,7 @@ function renderInstructor() {
             <div class="min-w-0 flex-1">
               <div class="flex flex-wrap items-center gap-2 mb-1">
                 ${index === 0 ? '<span class="px-2 py-0.5 rounded-full text-xs font-extrabold bg-sun/40 text-ink">Terbaru</span>' : ''}
-                ${isSelected ? '<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-mint/10 text-mint">✓ Sedang Tampil di Atas</span>' : ''}
+                ${isSelected ? '<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-mint/10 text-mint">✓ Sedang Dibuka di Atas</span>' : ''}
                 <span class="text-xs text-ink/40">${formattedDate}</span>
               </div>
               <h4 class="font-display font-extrabold text-xl md:text-2xl text-sky truncate">${esc(s.title || 'Pelatihan Baru')}</h4>
@@ -1039,19 +1009,19 @@ function renderInstructor() {
 
 /* ================= 9. RENDER TAMPILAN PESERTA DI HP ================= */
 function switchParticipantTab(tab) {
-  const isAsk = (tab === 'ask');
-  $('pViewAsk').classList.toggle('hidden', !isAsk);
-  $('pViewScore').classList.toggle('hidden', isAsk);
+  const isHand = (tab === 'hand');
+  $('pViewHand').classList.toggle('hidden', !isHand);
+  $('pViewScore').classList.toggle('hidden', isHand);
 
-  $('pTabAskBtn').classList.toggle('bg-white', isAsk);
-  $('pTabAskBtn').classList.toggle('shadow-sm', isAsk);
-  $('pTabAskBtn').classList.toggle('text-ink', isAsk);
-  $('pTabAskBtn').classList.toggle('text-ink/60', !isAsk);
+  $('pTabHandBtn').classList.toggle('bg-white', isHand);
+  $('pTabHandBtn').classList.toggle('shadow-sm', isHand);
+  $('pTabHandBtn').classList.toggle('text-ink', isHand);
+  $('pTabHandBtn').classList.toggle('text-ink/60', !isHand);
 
-  $('pTabScoreBtn').classList.toggle('bg-white', !isAsk);
-  $('pTabScoreBtn').classList.toggle('shadow-sm', !isAsk);
-  $('pTabScoreBtn').classList.toggle('text-ink', !isAsk);
-  $('pTabScoreBtn').classList.toggle('text-ink/60', isAsk);
+  $('pTabScoreBtn').classList.toggle('bg-white', !isHand);
+  $('pTabScoreBtn').classList.toggle('shadow-sm', !isHand);
+  $('pTabScoreBtn').classList.toggle('text-ink', !isHand);
+  $('pTabScoreBtn').classList.toggle('text-ink/60', isHand);
 }
 
 function renderParticipant() {
@@ -1070,7 +1040,20 @@ function renderParticipant() {
   $('pPts').textContent = myData.total_points || 0;
   $('pRank').textContent = `Peringkat ${myData.rank || 1} dari ${participants.length} peserta`;
 
-  // 5 Teratas
+  // Cek apakah tangan peserta ini sedang terangkat
+  const myHandLog = pointLogs.find(l => l.participant_id === meId && l.category === 'hand_raise');
+  const isRaised = !!myHandLog;
+
+  $('handIdleState').classList.toggle('hidden', isRaised);
+  $('handRaisedState').classList.toggle('hidden', !isRaised);
+
+  if (isRaised) {
+    const queueIdx = handRaiseQueue.findIndex(l => l.participant_id === meId);
+    const pos = (queueIdx >= 0) ? (queueIdx + 1) : 1;
+    $('queuePositionBadge').textContent = `Antrean ke-#${pos} di Kelas`;
+  }
+
+  // 5 Teratas di HP
   const topRows = rList.slice(0, 5);
   if (!topRows.find(x => x.id === meId)) topRows.push(myData);
 
@@ -1082,37 +1065,17 @@ function renderParticipant() {
     </li>
   `).join('');
 
-  // Render Riwayat Pengajuan Saya
-  renderMySubmissions();
-}
-
-function renderMySubmissions() {
-  const container = $('mySubmissionsList');
-  if (!container) return;
-
-  if (!myQuestions.length) {
-    container.innerHTML = '<p class="text-center text-ink/50 py-6 text-xs bg-paper rounded-2xl border border-ink/5">Anda belum mengajukan pertanyaan. Ajukan lewat form di atas!</p>';
-    return;
-  }
-
-  container.innerHTML = myQuestions.map(q => {
-    const isPending = (q.status === 'pending');
-    const isApproved = (q.status === 'approved');
-    const catInfo = CATS[q.category] || CATS.ask;
-
-    return `
-      <div class="bg-paper border border-ink/10 rounded-2xl p-3.5 space-y-2 text-xs">
-        <div class="flex items-center justify-between">
-          <span class="font-bold px-2 py-0.5 rounded-md ${catInfo.badge}">${catInfo.l}</span>
-          ${isPending ? '<span class="text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded-md">⏳ Menunggu Panitia</span>' : ''}
-          ${isApproved ? `<span class="text-mint font-bold bg-mint/10 px-2 py-0.5 rounded-md">✅ Disetujui (+${q.points_awarded} Pts)</span>` : ''}
-          ${q.status === 'rejected' ? '<span class="text-coral font-bold bg-coral/10 px-2 py-0.5 rounded-md">❌ Belum Disetujui</span>' : ''}
-        </div>
-        <p class="text-ink/90 font-medium">${esc(q.question_text)}</p>
-        <p class="text-[10px] text-ink/40">${fmt(q.created_at)}</p>
+  // Riwayat Poin yang diterima peserta ini
+  const myPointLogs = pointLogs.filter(l => l.participant_id === meId && l.category !== 'hand_raise');
+  $('myPointHistoryList').innerHTML = myPointLogs.length ? myPointLogs.map(l => `
+    <div class="flex items-center justify-between py-2 border-b border-ink/5 text-xs">
+      <div>
+        <span class="font-bold text-ink">${esc(l.description || CATS[l.category]?.l || 'Partisipasi')}</span>
+        <p class="text-[10px] text-ink/40">${fmt(l.created_at)}</p>
       </div>
-    `;
-  }).join('');
+      <span class="font-display font-bold text-mint">+${l.points} Poin</span>
+    </div>
+  `).join('') : '<p class="text-xs text-ink/40 py-2">Belum ada catatan poin partisipasi.</p>';
 }
 
 const render = () => PMODE ? renderParticipant() : renderInstructor();
@@ -1138,7 +1101,7 @@ async function exportCSV(targetCode = code) {
   });
 
   const { data: lList } = await db.from('quiz_point_logs').select('*').eq('session_code', targetCode).order('created_at', { ascending: false });
-  const lRows = lList || [];
+  const lRows = (lList || []).filter(l => l.category !== 'hand_raise');
 
   const cell = v => /[;"\n]/.test(v = String(v)) ? '"' + v.replace(/"/g, '""') + '"' : v;
   const rows = [
