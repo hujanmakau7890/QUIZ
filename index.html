@@ -45,15 +45,53 @@ tailwind.config = { theme: { extend: {
       <button data-go="kuis" class="tab px-4 py-2 rounded-full text-sm font-medium">Kelola Kuis</button>
       <button data-go="riwayat" class="tab px-4 py-2 rounded-full text-sm font-medium">Riwayat</button>
     </nav>
-    <button onclick="exportCSV()" class="px-4 py-2 rounded-full text-sm font-medium bg-ink text-white hover:bg-sky transition-colors">Ekspor CSV</button>
+    <div class="flex items-center gap-2.5 ml-auto">
+      <div id="topClassBadge" class="hidden flex items-center gap-1.5 bg-sun/20 border border-sun/50 rounded-full px-3.5 py-1.5 text-xs md:text-sm font-bold text-ink">
+        <span class="w-2 h-2 rounded-full bg-sun animate-pulse"></span>
+        <span id="topClassName" class="max-w-[160px] md:max-w-[260px] truncate"></span>
+      </div>
+      <button onclick="exportCSV()" class="px-4 py-2 rounded-full text-sm font-medium bg-ink text-white hover:bg-sky transition-colors shadow-sm">Ekspor CSV</button>
+    </div>
   </div>
 </header>
+
+<!-- Modal Buat Sesi Baru (Modern UI, Tanpa Browser Alert) -->
+<div id="newSessionModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/60 backdrop-blur-sm">
+  <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-ink/10 space-y-4">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="w-10 h-10 rounded-2xl bg-sun/40 text-ink flex items-center justify-center text-xl font-bold">🎓</div>
+        <div>
+          <h3 class="font-display font-extrabold text-xl text-ink">Buat Sesi Pelatihan Baru</h3>
+          <p class="text-xs text-ink/60">Tentukan topik atau nama materi pelatihan</p>
+        </div>
+      </div>
+      <button onclick="closeModal()" class="w-8 h-8 rounded-full bg-ink/5 hover:bg-ink/10 flex items-center justify-center text-ink/60 text-lg transition-colors">✕</button>
+    </div>
+
+    <div>
+      <label for="sessionNameInput" class="block text-sm font-semibold text-ink mb-1.5">Nama Kelas / Topik Pelatihan:</label>
+      <input id="sessionNameInput" type="text" placeholder="Contoh: ISM Code & Safety Drill 2026"
+        class="w-full bg-paper border border-ink/15 rounded-xl px-4 py-3 text-base text-ink font-medium focus:border-sky focus:bg-white focus:outline-none transition-all">
+      <p id="sessionNameErr" class="hidden text-xs text-coral font-medium mt-1.5">Nama kelas tidak boleh kosong!</p>
+    </div>
+
+    <div class="flex gap-2.5 pt-2">
+      <button onclick="submitNewSession()" class="flex-1 py-3 px-5 rounded-xl bg-sun text-ink font-bold hover:brightness-95 shadow transition-all">
+        Buat Sesi
+      </button>
+      <button onclick="closeModal()" class="py-3 px-5 rounded-xl bg-ink/5 text-ink/70 font-semibold hover:bg-ink/10 transition-colors">
+        Batal
+      </button>
+    </div>
+  </div>
+</div>
 
 <main id="admin" class="max-w-7xl mx-auto p-4">
   <!-- Peserta -->
   <section data-tab="peserta">
     <div class="flex flex-wrap items-center gap-3 mb-5">
-      <button onclick="newSession()" class="px-5 py-3 rounded-xl bg-sun font-bold text-ink shadow hover:brightness-95 transition-all">Buat Sesi Pelatihan Baru</button>
+      <button onclick="openModal()" class="px-5 py-3 rounded-xl bg-sun font-bold text-ink shadow hover:brightness-95 transition-all">Buat Sesi Pelatihan Baru</button>
       <div class="flex gap-2 ml-auto">
         <input id="joinCode" type="text" placeholder="Kode sesi lama" aria-label="Kode sesi lama" class="w-40 bg-white border border-ink/15 rounded-xl px-3 py-2.5 uppercase focus:border-sky focus:outline-none">
         <button onclick="joinSession()" class="px-4 py-2.5 rounded-xl bg-ink/5 font-medium hover:bg-ink/10 transition-colors">Buka</button>
@@ -66,8 +104,8 @@ tailwind.config = { theme: { extend: {
       <div class="bg-white border border-ink/10 rounded-2xl p-4 md:p-5 mb-5 flex flex-wrap gap-5 items-center shadow-sm">
         <div id="qr" class="bg-white p-2 border border-ink/10 rounded-xl shadow-inner"></div>
         <div class="flex-1 min-w-[16rem]">
-          <p class="text-xs uppercase tracking-wider text-ink/50 font-semibold">Kode kelas untuk peserta:</p>
-          <p id="codeTxt" class="font-display font-extrabold text-4xl tracking-wider text-sky mt-0.5"></p>
+          <p class="text-xs uppercase tracking-wider text-ink/50 font-semibold">Nama Kelas / Pelatihan:</p>
+          <h2 id="cardClassTitle" class="font-display font-extrabold text-2xl md:text-3xl text-sky mt-1 leading-snug"></h2>
           <p id="cnt" class="mt-2 text-base text-ink/80"></p>
           
           <div class="mt-3 bg-paper border border-ink/10 rounded-xl p-3">
@@ -382,15 +420,25 @@ function drawQR(el, size) {
   new QRCode(el, { text: joinUrl(), width: size, height: size, colorDark: '#16213E', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
 }
 
-async function newSession() {
-  const currentTitle = $('cls').value.trim();
-  const inputTitle = prompt('Masukkan nama kelas / topik pelatihan:', currentTitle || '');
-  if (inputTitle === null) return; // User membatalkan
-  const title = inputTitle.trim();
+function openModal() {
+  $('sessionNameInput').value = $('cls').value.trim() || '';
+  $('sessionNameErr').classList.add('hidden');
+  $('newSessionModal').classList.remove('hidden');
+  setTimeout(() => $('sessionNameInput').focus(), 100);
+}
+
+function closeModal() {
+  $('newSessionModal').classList.add('hidden');
+}
+
+async function submitNewSession() {
+  const title = $('sessionNameInput').value.trim();
   if (!title) {
-    toast('Nama kelas / topik pelatihan tidak boleh kosong');
+    $('sessionNameErr').classList.remove('hidden');
+    $('sessionNameInput').focus();
     return;
   }
+  closeModal();
   $('cls').value = title;
 
   const chars = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
@@ -406,7 +454,7 @@ async function newSession() {
   await insertDefaultQuestions(c);
 
   setCode(c);
-  toast(`Sesi ${c} (${title}) berhasil dibuat!`);
+  toast(`Sesi "${title}" berhasil dibuat!`);
 }
 
 async function insertDefaultQuestions(sessionCode) {
@@ -847,9 +895,13 @@ function renderInstructor() {
     }
   }
 
-  $('bCode').textContent = has ? code : '';
+  const classTitle = (currentSession && currentSession.title) || '';
+  if ($('bCode')) $('bCode').textContent = classTitle;
+  if ($('topClassName')) $('topClassName').textContent = classTitle;
+  if ($('topClassBadge')) $('topClassBadge').classList.toggle('hidden', !has);
+  if ($('cardClassTitle')) $('cardClassTitle').textContent = classTitle;
+
   if (has) {
-    $('codeTxt').textContent = code;
     $('joinUrl').textContent = u;
     $('cnt').innerHTML = `Peserta Terdaftar: <b class="font-display font-extrabold text-3xl align-middle text-ink">${participants.length}</b> Orang`;
     renderCards();
@@ -1001,12 +1053,20 @@ document.addEventListener('click', e => {
 $('q').addEventListener('input', () => renderCards());
 
 $('cls').addEventListener('input', e => {
+  const val = e.target.value.trim();
+  if ($('topClassName')) $('topClassName').textContent = val;
+  if ($('cardClassTitle')) $('cardClassTitle').textContent = val;
   clearTimeout(ct);
   ct = setTimeout(async () => {
     if (code && currentSession) {
-      await db.from('quiz_sessions').update({ title: e.target.value.trim() }).eq('code', code);
+      await db.from('quiz_sessions').update({ title: val }).eq('code', code);
     }
   }, 500);
+});
+
+$('sessionNameInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') submitNewSession();
+  if (e.key === 'Escape') closeModal();
 });
 
 // Start App
