@@ -884,10 +884,6 @@ function renderInstructor() {
   $('noSes').classList.toggle('hidden', has);
   $('ses').classList.toggle('hidden', !has);
 
-  if (has && document.activeElement !== $('cls')) {
-    $('cls').value = currentSession.title || '';
-  }
-
   const u = has ? joinUrl() : '';
   if (u !== lastQR) {
     lastQR = u;
