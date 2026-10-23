@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Papan Partisipasi Kelas</title>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<script>
+tailwind.config = { theme: { extend: {
+  fontFamily: { display: ['"Bricolage Grotesque"','system-ui','sans-serif'], sans: ['"DM Sans"','system-ui','sans-serif'] },
+  colors: { ink:'#16213E', paper:'#F3F6FB', mint:'#0E8F6F', coral:'#D63A40', sun:'#FFC233', sky:'#3E63DD' }
+}}};
+</script>
+<style>
+  :focus-visible { outline: 3px solid #3E63DD; outline-offset: 2px; }
+  .grow { transform-origin: left; animation: grow .9s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes grow { from { transform: scaleX(0); } }
+  #pv, #exit { display: none; }
+  .p #hd, .p #admin { display: none; }
+  .p #pv { display: block; }
+  .proj { background: #16213E; }
+  .proj #hd, .proj .noproj { display: none; }
+  .proj #admin { max-width: none; padding: 0; }
+  .proj #board { border-radius: 0; min-height: 100vh; }
+  .proj #exit { display: block; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body class="bg-paper text-ink font-sans min-h-screen">
+
+<!-- ================= TAMPILAN INSTRUKTUR ================= -->
+<header id="hd" class="sticky top-0 z-20 bg-paper/90 backdrop-blur border-b border-ink/10">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center gap-3">
+    <input id="cls" type="text" placeholder="Nama kelas / pelatihan" aria-label="Nama kelas atau pelatihan"
+      class="flex-1 min-w-[12rem] bg-transparent font-display font-extrabold text-2xl md:text-3xl placeholder:text-ink/30 border-b-2 border-transparent hover:border-ink/15 focus:border-sky focus:outline-none py-1">
+    <nav class="flex gap-1 bg-ink/5 rounded-full p-1" aria-label="Tampilan">
+      <button data-go="peserta" class="tab px-4 py-2 rounded-full text-sm font-medium">Peserta</button>
+      <button data-go="papan" class="tab px-4 py-2 rounded-full text-sm font-medium">Papan skor</button>
+      <button data-go="riwayat" class="tab px-4 py-2 rounded-full text-sm font-medium">Riwayat</button>
+    </nav>
+    <button onclick="exportCSV()" class="px-4 py-2 rounded-full text-sm font-medium bg-ink text-white hover:bg-sky">Ekspor CSV</button>
+  </div>
+</header>
+
+<main id="admin" class="max-w-7xl mx-auto p-4">
+  <p id="modeNote" class="hidden mb-4 bg-sun/30 rounded-xl px-4 py-3 text-sm">
+    <b>Mode lokal:</b> Firebase belum diisi, jadi data hanya tersimpan di browser ini dan peserta di HP lain belum bisa mendaftar.
+    Isi <code>FIREBASE_CONFIG</code> di bagian atas script.
+  </p>
+
+  <!-- Peserta -->
+  <section data-tab="peserta">
+    <div class="flex flex-wrap items-center gap-3 mb-5">
+      <button onclick="newSession()" class="px-5 py-3 rounded-xl bg-sun font-bold hover:brightness-95">Buat Sesi Pelatihan Baru</button>
+      <div class="flex gap-2 ml-auto">
+        <input id="joinCode" type="text" placeholder="Kode sesi lama" aria-label="Kode sesi lama" class="w-40 bg-white border border-ink/15 rounded-xl px-3 py-2.5 uppercase focus:border-sky focus:outline-none">
+        <button onclick="joinSession()" class="px-4 py-2.5 rounded-xl bg-ink/5 font-medium hover:bg-ink/10">Buka</button>
+      </div>
+    </div>
+
+    <p id="noSes" class="text-center text-ink/60 py-16">Belum ada sesi. Klik “Buat Sesi Pelatihan Baru” untuk mendapatkan kode kelas dan QR pendaftaran.</p>
+
+    <div id="ses" class="hidden">
+      <div class="bg-white border border-ink/10 rounded-2xl p-4 md:p-5 mb-5 flex flex-wrap gap-5 items-center">
+        <div id="qr" class="bg-white p-2 border border-ink/10 rounded-xl"></div>
+        <div class="flex-1 min-w-[16rem]">
+          <p class="text-sm text-ink/60">Kode kelas</p>
+          <p id="codeTxt" class="font-display font-extrabold text-4xl"></p>
+          <p id="cnt" class="mt-2 text-lg"></p>
+          <label for="baseUrl" class="block text-sm text-ink/60 mt-3">Alamat halaman ini (isi alamat hosting jika berbeda)</label>
+          <input id="baseUrl" type="url" placeholder="https://situs-anda.netlify.app/" class="w-full bg-paper border border-ink/15 rounded-lg px-3 py-2 text-sm focus:border-sky focus:outline-none">
+          <p id="joinUrl" class="text-sm break-all text-sky mt-1"></p>
+          <div class="flex gap-2 mt-3">
+            <button onclick="copyLink()" class="px-4 py-2 rounded-lg bg-ink text-white text-sm font-medium hover:bg-sky">Salin tautan</button>
+            <button onclick="endSession()" class="px-4 py-2 rounded-lg text-sm font-medium text-coral hover:bg-coral/10">Hapus sesi</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3 mb-4">
+        <input id="q" type="search" placeholder="Cari nama atau divisi" aria-label="Cari peserta"
+          class="flex-1 min-w-[12rem] bg-white border border-ink/15 rounded-xl px-4 py-3 focus:border-sky focus:outline-none">
+        <button onclick="$('qa').classList.toggle('hidden');$('qaText').focus()" class="px-4 py-3 rounded-xl bg-ink/5 font-medium hover:bg-ink/10">Tambah manual</button>
+      </div>
+      <div id="qa" class="hidden mb-5 bg-white border border-ink/10 rounded-2xl p-4">
+        <label for="qaText" class="block font-medium mb-2">Tempel daftar nama, pisahkan dengan koma atau baris baru</label>
+        <textarea id="qaText" rows="3" placeholder="Budi, Siti, Andi" class="w-full border border-ink/15 rounded-xl p-3 focus:border-sky focus:outline-none"></textarea>
+        <div class="mt-3 flex gap-2">
+          <button onclick="quickAdd()" class="px-5 py-2.5 rounded-xl bg-ink text-white font-medium hover:bg-sky">Tambahkan</button>
+          <button onclick="$('qa').classList.add('hidden')" class="px-5 py-2.5 rounded-xl text-ink/70 hover:bg-ink/5">Tutup</button>
+        </div>
+      </div>
+      <p id="empty" class="text-center text-ink/60 py-12"></p>
+      <div id="cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
+    </div>
+  </section>
+
+  <!-- Papan skor -->
+  <section id="board" data-tab="papan" class="hidden bg-ink text-white rounded-3xl p-6 md:p-12">
+    <div class="flex items-start justify-between gap-4 mb-8 md:mb-12">
+      <div>
+        <h2 id="bTitle" class="font-display font-extrabold text-3xl md:text-6xl leading-tight"></h2>
+        <p class="text-white/60 md:text-xl mt-1">Papan skor partisipasi</p>
+      </div>
+      <div class="flex items-start gap-4">
+        <div class="noproj flex flex-col gap-2">
+          <button onclick="proj(true)" class="px-4 py-2 rounded-full bg-sun text-ink text-sm font-bold hover:brightness-95">Layar penuh</button>
+          <button onclick="window.open(location.href.split('#')[0]+'#papan','_blank')" class="px-4 py-2 rounded-full bg-white/10 text-sm font-medium hover:bg-white/20">Jendela baru</button>
+        </div>
+        <div class="text-center">
+          <div id="bQR" class="bg-white p-2 rounded-xl inline-block"></div>
+          <p id="bCode" class="font-display font-bold mt-1 md:text-xl"></p>
+          <p class="text-xs text-white/60">Pindai untuk daftar</p>
+        </div>
+        <button id="exit" onclick="proj(false)" class="px-4 py-2 rounded-full bg-white/10 text-sm text-white/70 hover:bg-white/20">Keluar</button>
+      </div>
+    </div>
+    <div id="bBody"></div>
+  </section>
+
+  <!-- Riwayat -->
+  <section data-tab="riwayat" class="hidden">
+    <h2 class="font-display font-extrabold text-2xl mb-1">Riwayat poin</h2>
+    <p class="text-ink/60 mb-4">Terbaru di atas. Undo membatalkan satu catatan dan mengembalikan poinnya.</p>
+    <ul id="log" class="bg-white border border-ink/10 rounded-2xl px-4"></ul>
+  </section>
+</main>
+
+<!-- ================= TAMPILAN PESERTA (?kelas=KODE) ================= -->
+<main id="pv" class="max-w-md mx-auto p-4">
+  <p id="pCls" class="font-display font-extrabold text-2xl mb-4"></p>
+  <p id="pLoad" class="text-center text-ink/60 py-16">Memuat…</p>
+  <p id="pErr" class="hidden bg-coral/10 text-coral rounded-xl p-4">Kode kelas tidak ditemukan. Pindai ulang QR dari layar instruktur, atau pastikan Firebase sudah diisi di file ini.</p>
+
+  <form id="pReg" class="hidden space-y-4" onsubmit="daftar(event)">
+    <h2 class="font-display font-semibold text-xl">Daftar untuk ikut papan skor</h2>
+    <div>
+      <label for="rName" class="block font-medium mb-1">Nama lengkap</label>
+      <input id="rName" autocomplete="name" required class="w-full bg-white border border-ink/15 rounded-xl px-4 py-3.5 text-lg focus:border-sky focus:outline-none">
+    </div>
+    <div>
+      <label for="rDiv" class="block font-medium mb-1">Divisi / Departemen</label>
+      <input id="rDiv" required class="w-full bg-white border border-ink/15 rounded-xl px-4 py-3.5 text-lg focus:border-sky focus:outline-none">
+    </div>
+    <button class="w-full py-4 rounded-xl bg-sun font-bold text-lg hover:brightness-95">Daftar</button>
+  </form>
+
+  <div id="pCard" class="hidden space-y-4">
+    <section class="bg-ink text-white rounded-3xl p-6">
+      <p id="pName" class="font-display font-semibold text-2xl"></p>
+      <p id="pDiv" class="text-white/60"></p>
+      <p class="mt-6 text-white/60">Total poin</p>
+      <p id="pPts" class="font-display font-extrabold text-8xl text-sun tabular-nums leading-none"></p>
+      <p id="pRank" class="mt-4"></p>
+    </section>
+    <section class="bg-white border border-ink/10 rounded-2xl p-4">
+      <h2 class="font-display font-semibold text-xl mb-1">Lima teratas</h2>
+      <ol id="pTop"></ol>
+    </section>
+  </div>
+</main>
+
+<div id="toast" role="status" aria-live="polite" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-ink text-white px-5 py-3 rounded-full shadow-lg opacity-0 pointer-events-none transition-opacity"></div>
+
+<script>
+/* ============================================================
+   1. ISI FIREBASE CONFIG ANDA DI SINI
+   - console.firebase.google.com → buat project → Build → Realtime Database → Create database
+   - Project settings → Your apps → Web (</>) → salin nilai firebaseConfig ke bawah ini
+   - Realtime Database → Rules, tempel lalu Publish:
+       { "rules": { "sessions": { "$code": { ".read": true, ".write": true } } } }
+     (Daftar sesi tidak bisa dilihat, tapi siapa pun yang tahu kode sesi bisa menulis. Cukup untuk pelatihan; hapus sesi setelah selesai.)
+   Biarkan apiKey kosong untuk mode lokal (tanpa Firebase).
+   ============================================================ */
+const FIREBASE_CONFIG = {
+  apiKey: "",
+  authDomain: "",
+  databaseURL: "",   // contoh: https://nama-project-default-rtdb.asia-southeast1.firebasedatabase.app
+  projectId: "",
+  appId: ""
+};
+
+/* ===================== 2. UTILITAS ===================== */
+const $ = id => document.getElementById(id);
+const ls = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
+const CATS = {
+  ask:   { l:'Bertanya', p:5,  c:'bg-sky/10 text-sky hover:bg-sky hover:text-white' },
+  crit:  { l:'Kritis',   p:10, c:'bg-mint/10 text-mint hover:bg-mint hover:text-white' },
+  ans:   { l:'Menjawab', p:5,  c:'bg-sun/30 text-ink hover:bg-sun' },
+  minus: { l:'Kurangi',  p:-2, c:'bg-coral/10 text-coral hover:bg-coral hover:text-white' }
+};
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sg = n => (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n);
+const fmt = t => new Date(t).toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+const norm = c => String(c || '').toUpperCase().replace(/[^A-Z0-9-]/g, '');
+
+const qs = new URLSearchParams(location.search);
+const PMODE = qs.has('kelas');                       // ?kelas=KODE → tampilan peserta
+let code = norm(PMODE ? qs.get('kelas') : ls.get('gcpt.code'));
+let S = {}, loaded = false, prevIds = null, q = '', tt, ct, lastQR = '', unsub = () => {};
+let meId = PMODE ? ls.get('gcpt.me.' + code) : null;
+if (PMODE) document.body.classList.add('p');
+
+/* ===================== 3. DATA (Firebase / lokal) ===================== */
+let FB = !!(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.databaseURL && typeof firebase !== 'undefined'), db;
+try { if (FB) { firebase.initializeApp(FIREBASE_CONFIG); db = firebase.database(); } } catch (e) { FB = false; }
+const lkey = c => 'gcpt.s.' + c;
+const fref = p => db.ref('sessions/' + code + (p ? '/' + p : ''));
+
+// Struktur: sessions/KODE/{ meta:{cls,created}, people:{id:{name,divisi,t,via}}, log:{id:{pid,name,cat,pts,t}} }
+function put(path, val) {
+  if (FB) return fref(path).set(val).catch(e => toast('Gagal menyimpan: ' + e.message));
+  const k = path.split('/'), last = k.pop(); let o = S;
+  k.forEach(x => o = o[x] = o[x] || {});
+  val === null ? delete o[last] : o[last] = val;
+  ls.set(lkey(code), JSON.stringify(S)); render();
+}
+function watch() {
+  unsub(); unsub = () => {};
+  if (!code) { loaded = true; return render(); }
+  if (FB) {
+    const r = fref(), h = r.on('value', s => onData(s.val()), e => toast('Koneksi gagal: ' + e.message));
+    unsub = () => r.off('value', h);
+  } else onData(JSON.parse(ls.get(lkey(code)) || 'null'));
+}
+function onData(d) {
+  S = d || {};
+  const ids = Object.keys(S.people || {});
+  if (loaded && prevIds && !PMODE) ids.filter(i => !prevIds.includes(i) && S.people[i].via === 'mandiri').forEach(i => toast(S.people[i].name + ' baru mendaftar'));
+  prevIds = ids; loaded = true; render();
+}
+const exists = c => FB ? db.ref('sessions/' + c + '/meta').once('value').then(s => s.exists()) : Promise.resolve(!!ls.get(lkey(c)));
+function setCode(c) { code = c; ls.set('gcpt.code', c); S = {}; loaded = false; prevIds = null; watch(); }
+window.addEventListener('storage', e => { if (!FB && e.key === lkey(code)) watch(); });
+
+const P = () => Object.entries(S.people || {}).map(([id, p]) => ({ id, ...p }));
+const L = () => Object.entries(S.log || {}).map(([id, l]) => ({ id, ...l })).sort((a, b) => a.t - b.t);
+function ranked() {
+  const m = {}, ps = P(); ps.forEach(p => m[p.id] = 0);
+  L().forEach(l => { if (l.pid in m) m[l.pid] += l.pts; });
+  const a = ps.map(p => ({ ...p, pts: m[p.id] })).sort((x, y) => y.pts - x.pts || x.name.localeCompare(y.name, 'id'));
+  let r = 0; a.forEach((p, i) => { if (!i || p.pts !== a[i-1].pts) r = i + 1; p.rank = r; });
+  return a;
+}
+
+/* ===================== 4. SESI & QR ===================== */
+const base = () => $('baseUrl').value.trim() || location.href.split(/[?#]/)[0];
+const joinUrl = () => base() + '?kelas=' + code;
+function drawQR(el, size) {
+  el.innerHTML = '';
+  if (typeof QRCode === 'undefined') { el.textContent = 'QR gagal dimuat'; return; }
+  new QRCode(el, { text: joinUrl(), width: size, height: size, colorDark: '#16213E', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+}
+async function newSession() {
+  const A = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'; let c;
+  try {
+    do { c = 'KELAS-' + Array.from({ length: 4 }, () => A[Math.random() * A.length | 0]).join(''); } while (await exists(c));
+    code = c; S = {};
+    await put('meta', { cls: $('cls').value.trim(), created: Date.now() });
+    setCode(c); toast('Sesi ' + c + ' dibuat');
+  } catch (e) { toast('Gagal membuat sesi: ' + e.message); }
+}
+async function joinSession() {
+  const c = norm($('joinCode').value); if (!c) return;
+  try { if (!(await exists(c))) return toast('Kode sesi tidak ditemukan'); } catch (e) { return toast('Gagal: ' + e.message); }
+  $('joinCode').value = ''; setCode(c);
+}
+async function endSession() {
+  if (!confirm('Hapus sesi ' + code + ' beserta semua peserta dan riwayatnya? Ekspor CSV dulu jika perlu.')) return;
+  try { if (FB) await fref().remove(); else localStorage.removeItem(lkey(code)); } catch (e) {}
+  setCode('');
+}
+function copyLink() {
+  (navigator.clipboard ? navigator.clipboard.writeText(joinUrl()) : Promise.reject())
+    .then(() => toast('Tautan disalin'), () => prompt('Salin tautan ini:', joinUrl()));
+}
+
+/* ===================== 5. AKSI ===================== */
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.style.opacity = 1; clearTimeout(tt); tt = setTimeout(() => t.style.opacity = 0, 1800); }
+function award(pid, cat) {
+  const p = (S.people || {})[pid]; if (!p) return;
+  put('log/' + uid(), { pid, name: p.name, cat, pts: CATS[cat].p, t: Date.now() });
+  toast(`${p.name} ${sg(CATS[cat].p)} ${CATS[cat].l}`);
+}
+function undo(id) { const l = (S.log || {})[id]; if (!l) return; put('log/' + id, null); toast(`Dibatalkan: ${l.name} ${sg(l.pts)}`); }
+function editP(id) {
+  const p = S.people[id]; if (!p) return;
+  const n = prompt('Nama lengkap:', p.name); if (n === null) return;
+  const d = prompt('Divisi / Departemen:', p.divisi || ''); if (d === null) return;
+  if (n.trim()) put('people/' + id, { ...p, name: n.trim(), divisi: d.trim() });
+}
+function delP(id) {
+  const p = S.people[id]; if (!p || !confirm(`Hapus ${p.name} beserta riwayat poinnya?`)) return;
+  L().forEach(l => { if (l.pid === id) put('log/' + l.id, null); });
+  put('people/' + id, null);
+}
+function quickAdd() {
+  const ex = new Set(P().map(p => p.name.toLowerCase())); let n = 0;
+  $('qaText').value.split(/[,;\n]+/).map(s => s.trim()).filter(Boolean).forEach((nm, i) => {
+    if (!ex.has(nm.toLowerCase())) { ex.add(nm.toLowerCase()); put('people/' + uid(), { name: nm, divisi: '', t: Date.now() + i }); n++; }
+  });
+  $('qaText').value = ''; toast(n ? `${n} peserta ditambahkan` : 'Tidak ada nama baru');
+}
+function daftar(e) {
+  e.preventDefault();
+  const n = $('rName').value.trim(), d = $('rDiv').value.trim();
+  if (!n || !d) return toast('Isi nama dan divisi');
+  if (P().some(p => p.name.toLowerCase() === n.toLowerCase())) return toast('Nama sudah terdaftar. Tambahkan nama belakang atau inisial.');
+  meId = uid(); ls.set('gcpt.me.' + code, meId);
+  put('people/' + meId, { name: n, divisi: d, t: Date.now(), via: 'mandiri' });
+}
+
+/* ===================== 6. TAMPILAN ===================== */
+function setTab(t) {
+  document.querySelectorAll('[data-tab]').forEach(e => e.classList.toggle('hidden', e.dataset.tab !== t));
+  document.querySelectorAll('.tab').forEach(b => {
+    const on = b.dataset.go === t;
+    b.classList.toggle('bg-ink', on); b.classList.toggle('text-white', on); b.classList.toggle('text-ink/70', !on);
+    on ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current');
+  });
+}
+function proj(on) {
+  document.body.classList.toggle('proj', on);
+  if (on) { try { document.documentElement.requestFullscreen()?.catch(() => {}); } catch (e) {} }
+  else if (document.fullscreenElement) document.exitFullscreen();
+}
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) document.body.classList.remove('proj'); });
+
+function renderCards() {
+  const m = {}; ranked().forEach(p => m[p.id] = p);
+  const k = q.trim().toLowerCase();
+  const all = P().sort((a, b) => (a.t || 0) - (b.t || 0) || a.name.localeCompare(b.name, 'id'));
+  const list = all.filter(p => (p.name + ' ' + (p.divisi || '')).toLowerCase().includes(k));
+  $('cards').innerHTML = list.map(p => { const x = m[p.id]; return `
+    <article class="bg-white border border-ink/10 rounded-2xl p-4 flex flex-col gap-3">
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0">
+          <h3 class="font-display font-semibold text-xl truncate">${esc(p.name)}</h3>
+          <p class="text-sm text-ink/60 truncate">${esc(p.divisi || 'Tanpa divisi')}, peringkat ${x.rank}</p>
+        </div>
+        <div class="flex shrink-0">
+          <button data-edit="${p.id}" aria-label="Edit ${esc(p.name)}" class="text-ink/40 hover:text-sky px-1.5">✎</button>
+          <button data-del="${p.id}" aria-label="Hapus ${esc(p.name)}" class="text-ink/40 hover:text-coral px-1.5">✕</button>
+        </div>
+      </div>
+      <div class="font-display font-extrabold text-5xl tabular-nums">${x.pts}</div>
+      <div class="grid grid-cols-2 gap-2">
+        ${Object.entries(CATS).map(([c, v]) => `<button data-a="${c}" data-id="${p.id}" class="min-h-[44px] rounded-xl text-sm font-bold transition-colors ${v.c}">${sg(v.p)} ${v.l}</button>`).join('')}
+      </div>
+    </article>`; }).join('');
+  $('empty').textContent = !all.length ? 'Belum ada peserta. Minta peserta memindai QR di atas, atau klik “Tambah manual”.'
+    : !list.length ? `Tidak ada peserta yang cocok dengan “${q}”.` : '';
+}
+
+function renderBoard() {
+  $('bTitle').textContent = (S.meta && S.meta.cls) || 'Papan Skor';
+  const r = ranked(), mx = Math.max(1, ...r.map(p => p.pts));
+  if (!r.length) { $('bBody').innerHTML = '<p class="text-white/60 text-xl">Menunggu peserta mendaftar…</p>'; return; }
+  const top = r.slice(0, 5).map(p => `
+    <li class="grid grid-cols-[3rem_1fr_auto] md:grid-cols-[5rem_1fr_auto] items-center gap-3 md:gap-6">
+      <span class="font-display font-extrabold text-4xl md:text-7xl text-right ${p.rank === 1 ? 'text-sun' : 'text-white/50'}">${p.rank}</span>
+      <div class="min-w-0">
+        <p class="font-display font-semibold text-xl md:text-4xl truncate">${esc(p.name)}</p>
+        <div class="mt-2 h-3 md:h-4 rounded-full bg-white/10 overflow-hidden">
+          <div class="grow h-full rounded-full ${p.rank === 1 ? 'bg-sun' : 'bg-[#8DA5FF]'}" style="width:${Math.max(0, p.pts) / mx * 100}%"></div>
+        </div>
+      </div>
+      <span class="font-display font-extrabold text-3xl md:text-6xl tabular-nums">${p.pts}</span>
+    </li>`).join('');
+  const rest = r.slice(5).map(p => `
+    <li class="flex items-baseline gap-3 py-2 border-b border-white/10">
+      <span class="w-8 text-right text-white/50 tabular-nums md:text-xl">${p.rank}</span>
+      <span class="flex-1 truncate text-lg md:text-2xl">${esc(p.name)}</span>
+      <span class="font-display font-bold text-xl md:text-2xl tabular-nums">${p.pts}</span>
+    </li>`).join('');
+  $('bBody').innerHTML = `<ol class="space-y-5 md:space-y-8">${top}</ol>` + (rest ? `
+    <h3 class="font-display font-semibold text-xl md:text-3xl mt-12 mb-3 text-white/70">Peserta lainnya</h3>
+    <ol class="grid md:grid-cols-2 xl:grid-cols-3 gap-x-10">${rest}</ol>` : '');
+}
+
+function renderLog() {
+  const rows = L().reverse();
+  $('log').innerHTML = rows.length ? rows.map(l => `
+    <li class="flex items-center gap-3 py-3 border-b border-ink/10 last:border-0">
+      <time class="text-sm text-ink/60 tabular-nums w-[5.5rem] shrink-0">${fmt(l.t)}</time>
+      <span class="font-medium flex-1 truncate">${esc(((S.people || {})[l.pid] || {}).name || l.name)}</span>
+      <span class="hidden sm:inline text-sm px-3 py-0.5 rounded-full bg-ink/5">${CATS[l.cat].l}</span>
+      <span class="font-display font-bold w-12 text-right ${l.pts < 0 ? 'text-coral' : 'text-mint'}">${sg(l.pts)}</span>
+      <button data-undo="${l.id}" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-ink/5 hover:bg-coral hover:text-white">Undo</button>
+    </li>`).join('') : '<li class="py-10 text-center text-ink/60">Belum ada catatan. Beri poin dari tab Peserta.</li>';
+}
+
+function renderA() {
+  const has = !!(code && S.meta);
+  $('noSes').classList.toggle('hidden', has); $('ses').classList.toggle('hidden', !has);
+  $('modeNote').classList.toggle('hidden', FB);
+  if (has && document.activeElement !== $('cls')) $('cls').value = S.meta.cls || '';
+  const u = has ? joinUrl() : '';
+  if (u !== lastQR) { lastQR = u; if (has) { drawQR($('qr'), 168); drawQR($('bQR'), 120); } else { $('qr').innerHTML = ''; $('bQR').innerHTML = ''; } }
+  $('bCode').textContent = has ? code : '';
+  if (has) {
+    $('codeTxt').textContent = code; $('joinUrl').textContent = u;
+    $('cnt').innerHTML = `Jumlah Peserta Terdaftar: <b class="font-display font-extrabold text-3xl align-middle">${P().length}</b>`;
+    renderCards();
+  }
+  renderBoard(); renderLog();
+}
+
+function renderP() {
+  const me = (S.people || {})[meId];
+  const st = !loaded ? 'pLoad' : !code || !S.meta ? 'pErr' : me ? 'pCard' : 'pReg';
+  ['pLoad', 'pErr', 'pReg', 'pCard'].forEach(i => $(i).classList.toggle('hidden', i !== st));
+  if (S.meta) $('pCls').textContent = S.meta.cls || 'Pelatihan';
+  if (st !== 'pCard') return;
+  const r = ranked(), x = r.find(p => p.id === meId);
+  $('pName').textContent = x.name; $('pDiv').textContent = x.divisi || '';
+  $('pPts').textContent = x.pts; $('pRank').textContent = `Peringkat ${x.rank} dari ${r.length} peserta`;
+  const rows = r.slice(0, 5); if (!rows.includes(x)) rows.push(x);
+  $('pTop').innerHTML = rows.map(p => `
+    <li class="flex items-center gap-3 py-2.5 ${p.id === meId ? 'bg-sun/30 -mx-2 px-2 rounded-lg' : ''}">
+      <span class="w-7 text-right font-display font-extrabold ${p.rank === 1 ? 'text-[#B8860B]' : 'text-ink/40'}">${p.rank}</span>
+      <span class="flex-1 truncate font-medium">${esc(p.name)}${p.id === meId ? ' (Anda)' : ''}</span>
+      <span class="font-display font-bold tabular-nums">${p.pts}</span>
+    </li>`).join('');
+}
+const render = () => PMODE ? renderP() : renderA();
+
+function exportCSV() {
+  const r = ranked(), n = (id, c) => L().filter(l => l.pid === id && l.cat === c).length;
+  const cell = v => /[;"\n]/.test(v = String(v)) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  const nm = l => ((S.people || {})[l.pid] || {}).name || l.name;
+  const rows = [
+    ['Kelas', (S.meta && S.meta.cls) || '-', 'Kode', code], [],
+    ['Peringkat','Nama','Divisi','Total Poin','Bertanya','Kritis','Menjawab','Dikurangi'],
+    ...r.map(p => [p.rank, p.name, p.divisi || '', p.pts, n(p.id,'ask'), n(p.id,'crit'), n(p.id,'ans'), n(p.id,'minus')]),
+    [], ['Riwayat Aktivitas'], ['Waktu','Nama','Kategori','Poin'],
+    ...L().map(l => [new Date(l.t).toLocaleString('id-ID'), nm(l), CATS[l.cat].l, l.pts])
+  ];
+  const csv = '\uFEFFsep=;\n' + rows.map(x => x.map(cell).join(';')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8' }));
+  a.download = `partisipasi-${code || 'kelas'}-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(a.href);
+  toast('CSV diunduh. Buka dengan Excel.');
+}
+
+/* ===================== 7. EVENT & START ===================== */
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-a],[data-undo],[data-del],[data-edit],[data-go]'); if (!b) return;
+  const d = b.dataset;
+  if (d.a) award(d.id, d.a); else if (d.undo) undo(d.undo); else if (d.del) delP(d.del); else if (d.edit) editP(d.edit); else if (d.go) setTab(d.go);
+});
+$('q').addEventListener('input', e => { q = e.target.value; renderCards(); });
+$('cls').addEventListener('input', e => { clearTimeout(ct); ct = setTimeout(() => { if (code && S.meta) put('meta/cls', e.target.value.trim()); }, 400); });
+$('baseUrl').value = ls.get('gcpt.base') || '';
+$('baseUrl').addEventListener('input', e => { ls.set('gcpt.base', e.target.value.trim()); lastQR = ''; renderA(); });
+
+watch();
+setTab(location.hash === '#papan' ? 'papan' : 'peserta');
+</script>
+</body>
+</html>
